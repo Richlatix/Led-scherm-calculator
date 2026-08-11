@@ -18,7 +18,6 @@
       background-color: var(--bg-dark); color: var(--text); display: flex; overflow: hidden;
     }
 
-    /* --- LOGIN SCHERM --- */
     #login-overlay {
       position: fixed; top: 0; left: 0; width: 100%; height: 100%;
       background-color: rgba(0,0,0,0.9); z-index: 100;
@@ -32,7 +31,6 @@
       background-color: #1e1e1e; border: 1px solid var(--border); color: white; border-radius: 4px;
     }
 
-    /* --- ZIJBALK & UI --- */
     #sidebar {
       width: 350px; background-color: var(--bg-panel); padding: 15px;
       box-shadow: 2px 0 5px rgba(0,0,0,0.5); z-index: 10; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;
@@ -54,7 +52,6 @@
     .wall-item { background: #1e1e1e; border: 1px solid var(--border); padding: 8px; display: flex; justify-content: space-between; align-items: center; border-radius: 4px; font-size: 13px; }
     .wall-item button { width: auto; padding: 4px 8px; margin: 0; background-color: #cc3300; }
 
-    /* --- WORKSPACE --- */
     #workspace { flex: 1; position: relative; overflow: auto; background-color: #000; }
     #zoom-controls { position: absolute; bottom: 20px; right: 20px; background: var(--bg-panel); padding: 10px; border-radius: 4px; z-index: 10; display: flex; align-items: center; gap: 10px;}
     
@@ -69,13 +66,12 @@
 </head>
 <body>
 
-  <!-- LOGIN SCHERM -->
   <div id="login-overlay">
     <div class="login-box">
       <h2>Team Access</h2>
       <p>Voer je pincode in om de bibliotheek te laden.</p>
       <input type="password" id="pinInput" maxlength="3">
-      <button onclick="checkPin()">Inloggen</button>
+      <button id="loginBtn">Inloggen</button>
       <p id="loginError" style="color: red; display: none;">Foute code of systeemfout!</p>
     </div>
   </div>
@@ -84,13 +80,12 @@
     <h2 style="margin: 0;">Pixelmap Pro</h2>
     <p id="db-status" style="margin: 0 0 10px 0; font-size: 11px; color: #aaa;">Database: Wachten op login...</p>
 
-    <!-- Project Bestand Beheer -->
     <details open>
       <summary>Project Opslaan / Openen</summary>
       <div class="form-row">
-        <button onclick="exportProject()" class="success">Opslaan (.json)</button>
-        <button onclick="document.getElementById('importFile').click()" style="background-color: #555;">Openen</button>
-        <input type="file" id="importFile" style="display:none;" accept=".json" onchange="importProject(event)">
+        <button id="exportBtn" class="success">Opslaan (.json)</button>
+        <button id="openBtn" style="background-color: #555;">Openen</button>
+        <input type="file" id="importFile" style="display:none;" accept=".json">
       </div>
     </details>
 
@@ -110,7 +105,7 @@
         <div class="form-group"><label>X Positie</label><input type="number" id="posX" value="500"></div>
         <div class="form-group"><label>Y Positie</label><input type="number" id="posY" value="500"></div>
       </div>
-      <button onclick="addWall()">Plaats Scherm</button>
+      <button id="addWallBtn">Plaats Scherm</button>
     </details>
 
     <details open>
@@ -126,130 +121,140 @@
     <div id="canvas-workspace"></div>
     <div id="zoom-controls">
       <label style="color:white; font-size: 12px; margin:0;">Zoom:</label>
-      <input type="range" id="zoom" min="0.05" max="1" step="0.05" value="0.15" oninput="updateZoom(this.value)">
+      <input type="range" id="zoom" min="0.05" max="1" step="0.05" value="0.15">
     </div>
   </div>
 
   <script>
-    // --- 1. VEILIGE SUPABASE INITIALISATIE ---
-    const SUPABASE_URL = 'https://gjpoebdsyvqtxyazwmxp.supabase.co';
-    const SUPABASE_KEY = 'sb_publishable_PEUhiXzgdLhaaGdnsipBQQ_snAHkGfD';
-    
-    if (typeof window.supabaseClient === 'undefined') {
-        window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-    }
-    const supabase = window.supabaseClient;
+    (function() {
+      const SUPABASE_URL = 'https://gjpoebdsyvqtxyazwmxp.supabase.co';
+      const SUPABASE_KEY = 'sb_publishable_PEUhiXzgdLhaaGdnsipBQQ_snAHkGfD';
+      const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-    // --- STATE ---
-    let panelDb = {}; 
-    let walls = [];
-    let wallCounter = 1;
+      let panelDb = {}; 
+      let walls = [];
+      let wallCounter = 1;
 
-    // --- LOGIN LOGICA ---
-    window.checkPin = function() {
-      const pin = document.getElementById('pinInput').value;
-      if(pin === '666') {
-        document.getElementById('login-overlay').style.display = 'none';
-        document.getElementById('db-status').innerText = "Database: Verbinden...";
-        loadDatabase(); 
-      } else {
-        document.getElementById('loginError').style.display = 'block';
-      }
-    };
-
-    document.getElementById("pinInput").addEventListener("keyup", function(event) {
-        if (event.key === "Enter") window.checkPin();
-    });
-
-    // --- DATABASE INLADEN ---
-    async function loadDatabase() {
-      try {
-        const { data: ledData, error: ledError } = await supabase.from('led_types').select('*');
-        const select = document.getElementById('panelType');
-        select.innerHTML = ''; 
-
-        if (ledError || !ledData) {
-          document.getElementById('db-status').innerText = "Database: Fout bij laden";
-          return;
+      function checkPin() {
+        const pin = document.getElementById('pinInput').value;
+        if(pin === '666') {
+          document.getElementById('login-overlay').style.display = 'none';
+          document.getElementById('db-status').innerText = "Database: Verbinden...";
+          loadDatabase(); 
+        } else {
+          document.getElementById('loginError').style.display = 'block';
         }
+      }
 
-        ledData.forEach(panel => {
-          panelDb[panel.id] = { id: panel.id, name: panel.name, pixelWidth: panel.pixel_width, pixelHeight: panel.pixel_height, powerMax: panel.power_max };
-          const option = document.createElement('option');
-          option.value = panel.id; 
-          option.innerText = `${panel.name} (${panel.pixel_width}x${panel.pixel_height})`;
-          select.appendChild(option);
+      async function loadDatabase() {
+        try {
+          const { data: ledData, error: ledError } = await db.from('led_types').select('*');
+          const select = document.getElementById('panelType');
+          select.innerHTML = ''; 
+
+          if (ledError || !ledData) {
+            document.getElementById('db-status').innerText = "Database: Fout bij laden";
+            return;
+          }
+
+          ledData.forEach(panel => {
+            panelDb[panel.id] = { id: panel.id, name: panel.name, pixelWidth: panel.pixel_width, pixelHeight: panel.pixel_height, powerMax: panel.power_max };
+            const option = document.createElement('option');
+            option.value = panel.id; 
+            option.innerText = `${panel.name} (${panel.pixel_width}x${panel.pixel_height})`;
+            select.appendChild(option);
+          });
+
+          document.getElementById('db-status').innerText = "Database: Verbonden";
+          document.getElementById('db-status').style.color = "#00ffcc";
+        } catch (error) {
+          console.error(error);
+        }
+      }
+
+      function exportProject() {
+        const blob = new Blob([JSON.stringify(walls, null, 2)], { type: "application/json" });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url; a.download = "pixelmap.json"; a.click();
+      }
+
+      function importProject(event) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          walls = JSON.parse(e.target.result);
+          renderCanvas(); renderWallList();
+        };
+        reader.readAsText(event.target.files[0]);
+      }
+
+      function addWall() {
+        const typeId = document.getElementById('panelType').value;
+        if(!typeId) return alert("Selecteer eerst een paneel!");
+        walls.push({
+          id: 'Scherm ' + wallCounter++,
+          panel: panelDb[typeId],
+          cols: parseInt(document.getElementById('cols').value),
+          rows: parseInt(document.getElementById('rows').value),
+          x: parseInt(document.getElementById('posX').value),
+          y: parseInt(document.getElementById('posY').value)
+        });
+        renderCanvas(); renderWallList();
+      }
+
+      window.removeWall = function(index) { 
+        walls.splice(index, 1); 
+        renderCanvas(); 
+        renderWallList(); 
+      };
+
+      function renderWallList() {
+        const list = document.getElementById('wallList');
+        list.innerHTML = '';
+        walls.forEach((w, i) => {
+          list.innerHTML += `<div class="wall-item"><span>${w.id}</span> <button onclick="removeWall(${i})">X</button></div>`;
+        });
+      }
+
+      function renderCanvas() {
+        const canvas = document.getElementById('canvas-workspace');
+        canvas.innerHTML = '';
+        let totalPixels = 0, totalPower = 0;
+
+        walls.forEach(wall => {
+          const wallDiv = document.createElement('div');
+          wallDiv.className = 'led-wall';
+          wallDiv.style.gridTemplateColumns = `repeat(${wall.cols}, ${wall.panel.pixelWidth}px)`;
+          wallDiv.style.gridTemplateRows = `repeat(${wall.rows}, ${wall.panel.pixelHeight}px)`;
+          wallDiv.style.left = wall.x + 'px';
+          wallDiv.style.top = wall.y + 'px';
+          
+          const totalPanels = wall.cols * wall.rows;
+          for (let i = 0; i < totalPanels; i++) {
+            const p = document.createElement('div');
+            p.className = 'led-panel';
+            p.innerText = `${wall.id}\nP${i+1}`;
+            wallDiv.appendChild(p);
+          }
+          canvas.appendChild(wallDiv);
+          totalPixels += totalPanels * (wall.panel.pixelWidth * wall.panel.pixelHeight);
+          totalPower += totalPanels * (wall.panel.powerMax || 0);
         });
 
-        document.getElementById('db-status').innerText = "Database: Verbonden";
-        document.getElementById('db-status').style.color = "#00ffcc";
-      } catch (error) {
-        console.error(error);
+        document.getElementById('totalPixels').innerText = totalPixels.toLocaleString() + ' Pixels';
+        document.getElementById('totalPower').innerText = totalPower.toLocaleString() + ' Watt max';
       }
-    }
 
-    // --- IMPORT / EXPORT ---
-    window.exportProject = function() {
-      const blob = new Blob([JSON.stringify(walls, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = "pixelmap.json"; a.click();
-    };
-
-    window.importProject = function(event) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        walls = JSON.parse(e.target.result);
-        renderCanvas(); renderWallList();
-      };
-      reader.readAsText(event.target.files[0]);
-    };
-
-    // --- SCHERM LOGICA ---
-    window.addWall = function() {
-      const typeId = document.getElementById('panelType').value;
-      walls.push({
-        id: 'Scherm ' + wallCounter++,
-        panel: panelDb[typeId],
-        cols: parseInt(document.getElementById('cols').value),
-        rows: parseInt(document.getElementById('rows').value),
-        x: parseInt(document.getElementById('posX').value),
-        y: parseInt(document.getElementById('posY').value)
+      document.getElementById('loginBtn').addEventListener('click', checkPin);
+      document.getElementById('pinInput').addEventListener('keyup', (e) => { if(e.key === 'Enter') checkPin(); });
+      document.getElementById('exportBtn').addEventListener('click', exportProject);
+      document.getElementById('openBtn').addEventListener('click', () => document.getElementById('importFile').click());
+      document.getElementById('importFile').addEventListener('change', importProject);
+      document.getElementById('addWallBtn').addEventListener('click', addWall);
+      document.getElementById('zoom').addEventListener('input', (e) => {
+        document.getElementById('canvas-workspace').style.transform = `scale(${e.target.value})`;
       });
-      renderCanvas(); renderWallList();
-    };
-
-    window.removeWall = function(index) { walls.splice(index, 1); renderCanvas(); renderWallList(); };
-
-    window.updateZoom = function(scale) { document.getElementById('canvas-workspace').style.transform = `scale(${scale})`; };
-
-    function renderWallList() {
-      const list = document.getElementById('wallList');
-      list.innerHTML = '';
-      walls.forEach((w, i) => {
-        list.innerHTML += `<div class="wall-item"><span>${w.id}</span> <button onclick="removeWall(${i})">X</button></div>`;
-      });
-    }
-
-    function renderCanvas() {
-      const canvas = document.getElementById('canvas-workspace');
-      canvas.innerHTML = '';
-      walls.forEach(wall => {
-        const wallDiv = document.createElement('div');
-        wallDiv.className = 'led-wall';
-        wallDiv.style.gridTemplateColumns = `repeat(${wall.cols}, ${wall.panel.pixelWidth}px)`;
-        wallDiv.style.gridTemplateRows = `repeat(${wall.rows}, ${wall.panel.pixelHeight}px)`;
-        wallDiv.style.left = wall.x + 'px';
-        wallDiv.style.top = wall.y + 'px';
-        for (let i = 0; i < (wall.cols * wall.rows); i++) {
-          const p = document.createElement('div');
-          p.className = 'led-panel';
-          p.innerText = 'P';
-          wallDiv.appendChild(p);
-        }
-        canvas.appendChild(wallDiv);
-      });
-    }
+    })();
   </script>
 </body>
 </html>
