@@ -76,7 +76,7 @@
       <p>Voer je pincode in om de bibliotheek te laden.</p>
       <input type="password" id="pinInput" maxlength="3">
       <button onclick="checkPin()">Inloggen</button>
-      <p id="loginError" style="color: red; display: none;">Foute code!</p>
+      <p id="loginError" style="color: red; display: none;">Foute code of systeemfout!</p>
     </div>
   </div>
 
@@ -131,7 +131,7 @@
   </div>
 
   <script>
-    // --- 1. SUPABASE SETUP ---
+    // --- 1. SUPABASE SETUP (Slechts één keer gedefinieerd!) ---
     const SUPABASE_URL = 'https://gjpoebdsyvqtxyazwmxp.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_PEUhiXzgdLhaaGdnsipBQQ_snAHkGfD';
     const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -154,44 +154,45 @@
       }
     }
 
-    // Luister ook naar de 'Enter' toets op het wachtwoord veld
+    // Luister naar de 'Enter' toets
     document.getElementById("pinInput").addEventListener("keyup", function(event) {
         if (event.key === "Enter") checkPin();
     });
 
     // --- DATABASE INLADEN ---
     async function loadDatabase() {
-      // Haal LED types op
-      const { data: ledData, error: ledError } = await supabase.from('led_types').select('*');
-      
-      const select = document.getElementById('panelType');
-      select.innerHTML = ''; 
+      try {
+        const { data: ledData, error: ledError } = await supabase.from('led_types').select('*');
+        const select = document.getElementById('panelType');
+        select.innerHTML = ''; 
 
-      if (ledError || !ledData || ledData.length === 0) {
-        console.error("Supabase error led_types:", ledError);
-        document.getElementById('db-status').innerText = "Database: Fout bij laden LED's";
-        document.getElementById('db-status').style.color = "red";
-      } else {
-        ledData.forEach(panel => {
-          panelDb[panel.id] = { id: panel.id, name: panel.name, pixelWidth: panel.pixel_width, pixelHeight: panel.pixel_height, powerMax: panel.power_max };
-          const option = document.createElement('option');
-          option.value = panel.id; 
-          option.innerText = `${panel.name} (${panel.pixel_width}x${panel.pixel_height})`;
-          select.appendChild(option);
-        });
-      }
-
-      // Haal Processors op (voor later gebruik)
-      const { data: procData, error: procError } = await supabase.from('processors').select('*');
-      if(procData) {
-          procData.forEach(proc => {
-              processorDb[proc.id] = { id: proc.id, name: proc.name, maxPixels: proc.max_pixels_per_port, totalPorts: proc.total_ports };
+        if (ledError || !ledData || ledData.length === 0) {
+          console.error("Supabase error led_types:", ledError);
+          document.getElementById('db-status').innerText = "Database: Fout bij laden LED's";
+          document.getElementById('db-status').style.color = "red";
+        } else {
+          ledData.forEach(panel => {
+            panelDb[panel.id] = { id: panel.id, name: panel.name, pixelWidth: panel.pixel_width, pixelHeight: panel.pixel_height, powerMax: panel.power_max };
+            const option = document.createElement('option');
+            option.value = panel.id; 
+            option.innerText = `${panel.name} (${panel.pixel_width}x${panel.pixel_height})`;
+            select.appendChild(option);
           });
-      }
+        }
 
-      if(!ledError) {
-          document.getElementById('db-status').innerText = "Database: Verbonden (Team)";
-          document.getElementById('db-status').style.color = "#00ffcc";
+        const { data: procData, error: procError } = await supabase.from('processors').select('*');
+        if(procData) {
+            procData.forEach(proc => {
+                processorDb[proc.id] = { id: proc.id, name: proc.name, maxPixels: proc.max_pixels_per_port, totalPorts: proc.total_ports };
+            });
+        }
+
+        if(!ledError) {
+            document.getElementById('db-status').innerText = "Database: Verbonden (Team)";
+            document.getElementById('db-status').style.color = "#00ffcc";
+        }
+      } catch (error) {
+        console.error("Critical database error:", error);
       }
     }
 
@@ -220,7 +221,6 @@
           const importedWalls = JSON.parse(e.target.result);
           walls = importedWalls;
           
-          // Bereken de hoogste wall id om de counter goed te zetten
           let highestId = 0;
           walls.forEach(w => {
               const num = parseInt(w.id.split(' ')[1]);
@@ -243,7 +243,7 @@
 
     function addWall() {
       const typeId = document.getElementById('panelType').value;
-      if(!typeId) return alert("Wacht tot de database is geladen!");
+      if(!typeId) return alert("Wacht tot de database is geladen of ververs de pagina.");
       
       const cols = parseInt(document.getElementById('cols').value);
       const rows = parseInt(document.getElementById('rows').value);
