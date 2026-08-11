@@ -131,19 +131,22 @@
   </div>
 
   <script>
-    // --- 1. SUPABASE SETUP (Slechts één keer gedefinieerd!) ---
+    // --- 1. VEILIGE SUPABASE INITIALISATIE ---
     const SUPABASE_URL = 'https://gjpoebdsyvqtxyazwmxp.supabase.co';
     const SUPABASE_KEY = 'sb_publishable_PEUhiXzgdLhaaGdnsipBQQ_snAHkGfD';
-    const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    
+    if (typeof window.supabaseClient === 'undefined') {
+        window.supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    }
+    const supabase = window.supabaseClient;
 
     // --- STATE ---
     let panelDb = {}; 
-    let processorDb = {};
     let walls = [];
     let wallCounter = 1;
 
     // --- LOGIN LOGICA ---
-    function checkPin() {
+    window.checkPin = function() {
       const pin = document.getElementById('pinInput').value;
       if(pin === '666') {
         document.getElementById('login-overlay').style.display = 'none';
@@ -152,11 +155,10 @@
       } else {
         document.getElementById('loginError').style.display = 'block';
       }
-    }
+    };
 
-    // Luister naar de 'Enter' toets
     document.getElementById("pinInput").addEventListener("keyup", function(event) {
-        if (event.key === "Enter") checkPin();
+        if (event.key === "Enter") window.checkPin();
     });
 
     // --- DATABASE INLADEN ---
@@ -166,139 +168,87 @@
         const select = document.getElementById('panelType');
         select.innerHTML = ''; 
 
-        if (ledError || !ledData || ledData.length === 0) {
-          console.error("Supabase error led_types:", ledError);
-          document.getElementById('db-status').innerText = "Database: Fout bij laden LED's";
-          document.getElementById('db-status').style.color = "red";
-        } else {
-          ledData.forEach(panel => {
-            panelDb[panel.id] = { id: panel.id, name: panel.name, pixelWidth: panel.pixel_width, pixelHeight: panel.pixel_height, powerMax: panel.power_max };
-            const option = document.createElement('option');
-            option.value = panel.id; 
-            option.innerText = `${panel.name} (${panel.pixel_width}x${panel.pixel_height})`;
-            select.appendChild(option);
-          });
+        if (ledError || !ledData) {
+          document.getElementById('db-status').innerText = "Database: Fout bij laden";
+          return;
         }
 
-        const { data: procData, error: procError } = await supabase.from('processors').select('*');
-        if(procData) {
-            procData.forEach(proc => {
-                processorDb[proc.id] = { id: proc.id, name: proc.name, maxPixels: proc.max_pixels_per_port, totalPorts: proc.total_ports };
-            });
-        }
+        ledData.forEach(panel => {
+          panelDb[panel.id] = { id: panel.id, name: panel.name, pixelWidth: panel.pixel_width, pixelHeight: panel.pixel_height, powerMax: panel.power_max };
+          const option = document.createElement('option');
+          option.value = panel.id; 
+          option.innerText = `${panel.name} (${panel.pixel_width}x${panel.pixel_height})`;
+          select.appendChild(option);
+        });
 
-        if(!ledError) {
-            document.getElementById('db-status').innerText = "Database: Verbonden (Team)";
-            document.getElementById('db-status').style.color = "#00ffcc";
-        }
+        document.getElementById('db-status').innerText = "Database: Verbonden";
+        document.getElementById('db-status').style.color = "#00ffcc";
       } catch (error) {
-        console.error("Critical database error:", error);
+        console.error(error);
       }
     }
 
-    // --- IMPORT / EXPORT LOGICA ---
-    function exportProject() {
-      if(walls.length === 0) return alert("Je hebt nog niks gebouwd om op te slaan!");
-      
-      const projectData = JSON.stringify(walls, null, 2);
-      const blob = new Blob([projectData], { type: "application/json" });
+    // --- IMPORT / EXPORT ---
+    window.exportProject = function() {
+      const blob = new Blob([JSON.stringify(walls, null, 2)], { type: "application/json" });
       const url = URL.createObjectURL(blob);
-      
       const a = document.createElement('a');
-      a.href = url;
-      a.download = "pixelmap_project.json";
-      a.click();
-      URL.revokeObjectURL(url);
-    }
+      a.href = url; a.download = "pixelmap.json"; a.click();
+    };
 
-    function importProject(event) {
-      const file = event.target.files[0];
-      if (!file) return;
-
+    window.importProject = function(event) {
       const reader = new FileReader();
-      reader.onload = function(e) {
-        try {
-          const importedWalls = JSON.parse(e.target.result);
-          walls = importedWalls;
-          
-          let highestId = 0;
-          walls.forEach(w => {
-              const num = parseInt(w.id.split(' ')[1]);
-              if(num > highestId) highestId = num;
-          });
-          wallCounter = highestId + 1;
-
-          renderCanvas();
-          renderWallList();
-        } catch (err) {
-          alert("Fout bij het laden van het bestand. Is het een geldig JSON project?");
-        }
+      reader.onload = (e) => {
+        walls = JSON.parse(e.target.result);
+        renderCanvas(); renderWallList();
       };
-      reader.readAsText(file);
-      event.target.value = ""; 
-    }
+      reader.readAsText(event.target.files[0]);
+    };
 
-    // --- SCHERMEN EN CANVAS LOGICA ---
-    function updateZoom(scale) { document.getElementById('canvas-workspace').style.transform = `scale(${scale})`; }
-
-    function addWall() {
+    // --- SCHERM LOGICA ---
+    window.addWall = function() {
       const typeId = document.getElementById('panelType').value;
-      if(!typeId) return alert("Wacht tot de database is geladen of ververs de pagina.");
-      
-      const cols = parseInt(document.getElementById('cols').value);
-      const rows = parseInt(document.getElementById('rows').value);
-      const x = parseInt(document.getElementById('posX').value);
-      const y = parseInt(document.getElementById('posY').value);
-
       walls.push({
         id: 'Scherm ' + wallCounter++,
         panel: panelDb[typeId],
-        cols: cols, rows: rows, x: x, y: y
+        cols: parseInt(document.getElementById('cols').value),
+        rows: parseInt(document.getElementById('rows').value),
+        x: parseInt(document.getElementById('posX').value),
+        y: parseInt(document.getElementById('posY').value)
       });
-      
       renderCanvas(); renderWallList();
-    }
+    };
 
-    function removeWall(index) { walls.splice(index, 1); renderCanvas(); renderWallList(); }
+    window.removeWall = function(index) { walls.splice(index, 1); renderCanvas(); renderWallList(); };
+
+    window.updateZoom = function(scale) { document.getElementById('canvas-workspace').style.transform = `scale(${scale})`; };
 
     function renderWallList() {
       const list = document.getElementById('wallList');
       list.innerHTML = '';
-      walls.forEach((wall, index) => {
-        const item = document.createElement('div');
-        item.className = 'wall-item';
-        item.innerHTML = `<span>${wall.id} (${wall.cols}x${wall.rows} ${wall.panel.name})</span> <button onclick="removeWall(${index})">X</button>`;
-        list.appendChild(item);
+      walls.forEach((w, i) => {
+        list.innerHTML += `<div class="wall-item"><span>${w.id}</span> <button onclick="removeWall(${i})">X</button></div>`;
       });
     }
 
     function renderCanvas() {
       const canvas = document.getElementById('canvas-workspace');
       canvas.innerHTML = '';
-      let totalPixels = 0, totalPower = 0;
-
-      walls.forEach((wall, wallIndex) => {
+      walls.forEach(wall => {
         const wallDiv = document.createElement('div');
         wallDiv.className = 'led-wall';
         wallDiv.style.gridTemplateColumns = `repeat(${wall.cols}, ${wall.panel.pixelWidth}px)`;
         wallDiv.style.gridTemplateRows = `repeat(${wall.rows}, ${wall.panel.pixelHeight}px)`;
         wallDiv.style.left = wall.x + 'px';
         wallDiv.style.top = wall.y + 'px';
-
-        const totalPanels = wall.cols * wall.rows;
-        for (let i = 0; i < totalPanels; i++) {
-          const panelDiv = document.createElement('div');
-          panelDiv.className = 'led-panel';
-          panelDiv.innerText = `${wall.id}\nP${i+1}`;
-          wallDiv.appendChild(panelDiv);
+        for (let i = 0; i < (wall.cols * wall.rows); i++) {
+          const p = document.createElement('div');
+          p.className = 'led-panel';
+          p.innerText = 'P';
+          wallDiv.appendChild(p);
         }
         canvas.appendChild(wallDiv);
-        totalPixels += totalPanels * (wall.panel.pixelWidth * wall.panel.pixelHeight);
-        totalPower += totalPanels * (wall.panel.powerMax || 0);
       });
-
-      document.getElementById('totalPixels').innerText = totalPixels.toLocaleString() + ' Pixels';
-      document.getElementById('totalPower').innerText = totalPower.toLocaleString() + ' Watt max';
     }
   </script>
 </body>
