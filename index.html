@@ -3,455 +3,1526 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LED Pixelmap Pro - V3.1</title>
+  <title>Pixelmap by MTR - V44 (Cloud Auth & Supabase)</title>
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <!-- Supabase CDN -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
   <style>
     :root {
-      --bg-app: #0f0f11;
-      --bg-panel: #1c1c21;
-      --bg-canvas: #1e1e24; /* Iets lichtere achtergrond voor het canvas */
-      --accent: #007acc;
-      --accent-hover: #005f9e;
-      --text: #e0e0e0;
-      --text-muted: #888;
-      --border: #333;
-      --grid-line: #33353b;
-      --warning: #ffaa00;
-      --danger: #cc3300;
-      --success: #00cc88;
+      --bg-app: #0a0a0c; --bg-panel: #16161a; --bg-canvas: #12141c; 
+      --accent: #0088ff; --accent-hover: #0066cc; --text: #e0e0e0;
+      --text-muted: #888; --border: #2a2a35; --grid-line: #1f2230;
+      --warning: #ffaa00; --danger: #cc3300; --success: #00cc88;
+      --phase-l1: #ff3366; --phase-l2: #33ccff; --phase-l3: #ffcc00;
     }
 
     * { box-sizing: border-box; }
-    body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg-app); color: var(--text); overflow: hidden; display: flex; }
+    body, html { margin: 0; padding: 0; height: 100vh; width: 100vw; font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg-app); color: var(--text); overflow: hidden; display: flex; flex-direction: row; flex-wrap: nowrap; }
 
-    /* LAYOUT ZIJBALKEN */
-    #sidebar-left, #sidebar-right { width: 340px; background: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 10; flex-shrink: 0; }
-    #sidebar-right { border-right: none; border-left: 1px solid var(--border); }
-    .panel-header { padding: 15px; background: #151518; border-bottom: 1px solid var(--border); font-weight: bold; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
-    .panel-content { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
+    #login-overlay { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: var(--bg-app); z-index: 9999; display: flex; align-items: center; justify-content: center; flex-direction: column; }
+    #login-overlay h2 { font-size: 32px; color: var(--accent); letter-spacing: 4px; margin-bottom: 30px; text-transform: uppercase; font-weight: 900; }
+    .login-box { background: var(--bg-panel); padding: 40px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 10px 50px rgba(0,0,0,0.8); text-align: center; }
 
-    /* WORKSPACE & CANVAS */
-    #workspace { flex: 1; position: relative; overflow: auto; background: var(--bg-app); padding: 40px; }
-    
-    #canvas-wrapper {
-      transform-origin: top left; 
-      transition: transform 0.2s; 
-      display: inline-block; /* Zorgt dat de wrapper strak om het canvas valt */
-    }
+    #sidebar-left { width: 340px; min-width: 340px; max-width: 340px; background: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 50; box-shadow: 2px 0 20px rgba(0,0,0,0.5); overflow-y: auto; }
+    #workspace { flex: 1 1 auto; min-width: 0; min-height: 0; position: relative; overflow: auto; background: var(--bg-app); padding: 150px 40px 100px 40px; cursor: grab; z-index: 1; }
+    #workspace.dragging { cursor: grabbing; }
+    #sidebar-right { width: 360px; min-width: 360px; max-width: 360px; background: var(--bg-panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; z-index: 50; box-shadow: -2px 0 20px rgba(0,0,0,0.5); overflow-y: auto; }
 
-    #canvas-container { 
-      background-color: var(--bg-canvas); 
-      background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-      background-size: 50px 50px; 
-      position: relative; /* Belangrijk: geen absolute meer! Zorgt voor werkende scrollbars */
-      box-shadow: 0 0 40px rgba(0,0,0,0.8);
-      border: 1px solid #444;
-      overflow: hidden;
-    }
+    .panel-header { padding: 18px 15px; background: #0a0a0c; border-bottom: 1px solid var(--border); font-weight: 800; font-size: 16px; text-transform: uppercase; letter-spacing: 2px; color: var(--accent); position: sticky; top: 0; z-index: 10; }
+    .panel-content { padding: 15px; display: flex; flex-direction: column; gap: 8px; }
+
+    #canvas-wrapper { transform-origin: top left; transition: transform 0.2s ease-out; display: inline-block; pointer-events: none; }
+    #canvas-container { background-color: var(--bg-canvas); background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px); background-size: 50px 50px; position: relative; box-shadow: 0 10px 50px rgba(0,0,0,0.8); border: 1px solid #333; overflow: visible; pointer-events: auto; }
     
-    .led-wall { position: absolute; display: grid; outline: 2px solid var(--accent); box-shadow: 0 0 15px rgba(0, 122, 204, 0.4); }
-    .led-panel { border: 1px solid rgba(0,0,0,0.8); background: rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: center; font-size: 10px; color: #aaa; text-align: center; }
+    #wall-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 10; }
+    #cable-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 20; pointer-events: none; overflow: visible; }
+    #text-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 30; pointer-events: none; }
+
+    #canvas-size-label { position: absolute; bottom: 15px; right: 25px; color: rgba(255,255,255,0.2); font-size: 32px; font-weight: 800; pointer-events: none; z-index: 100; text-transform: uppercase; letter-spacing: 2px; }
+
+    .led-wall { position: absolute; outline: 1px solid var(--accent); box-shadow: 0 0 20px rgba(0, 136, 255, 0.2); transition: outline 0.2s; display: block; }
+    .led-wall.patching-active { outline: 3px dashed var(--success); box-shadow: 0 0 30px rgba(0, 204, 136, 0.4); z-index: 50; }
+    .led-wall.layout-active { outline: 3px dashed var(--accent); box-shadow: 0 0 30px rgba(0, 136, 255, 0.4); z-index: 50; }
+    .led-wall.hw-active { outline: 3px dashed #888; box-shadow: 0 0 30px rgba(255, 255, 255, 0.2); z-index: 50; }
     
-    /* SVG VOOR KABELS */
-    #cable-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }
-    .data-cable { stroke: var(--success); stroke-width: 3; fill: none; stroke-dasharray: 5,5; opacity: 0.8; }
+    .wall-title-giant { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: 900; color: #d4af37; text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0px 4px 15px rgba(0,0,0,0.8); pointer-events: none; z-index: 15; white-space: nowrap; opacity: 0.85; font-family: Arial, Helvetica, sans-serif; letter-spacing: 1px; }
+
+    .led-panel { position: absolute; border-style: solid; border-width: 1px; box-sizing: border-box; user-select: none; cursor: default; }
+    .led-panel:hover { filter: brightness(1.4); z-index: 5; }
+    .text-overlay { position: absolute; display: flex; align-items: center; justify-content: center; text-align: center; }
+    .oob-tint { position: absolute; background: rgba(204, 51, 0, 0.6); pointer-events: none; z-index: 2; }
+
+    .patch-bg { background-color: #111; border: 1px solid #333; padding: 2px 6px; border-radius: 4px; box-shadow: 0 0 10px rgba(0,0,0,0.9); }
+
+    .stack-ladder { position: absolute; width: 16px; left: calc(50% - 8px); bottom: 0; background-image: repeating-linear-gradient(0deg, transparent, transparent 18px, #1a1a1a 18px, #1a1a1a 22px); border-left: 2px solid #555; border-right: 2px solid #555; z-index: 0; pointer-events: none; opacity: 0.95; display: none; box-shadow: inset 1px 0 0 rgba(255,255,255,0.1), inset -1px 0 0 rgba(0,0,0,0.5); }
+    .stack-base { position: absolute; width: calc(100% + 4px); height: 16px; bottom: -16px; left: -2px; background: linear-gradient(180deg, #555, #222); border: 1px solid #000; z-index: 6; pointer-events: none; box-shadow: 0 5px 10px rgba(0,0,0,0.8); border-radius: 2px; display: none; }
+    .stack-foot { position: absolute; width: 16px; height: 6px; bottom: -22px; left: calc(50% - 8px); background: #111; border-radius: 4px; border-bottom: 2px solid #000; z-index: 5; pointer-events: none; display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+    .stack-foot::before { content: ''; position: absolute; width: 4px; height: 6px; top: -6px; left: 6px; background: repeating-linear-gradient(0deg, #666, #666 1px, #222 1px, #222 2px); }
     
-    /* UI ELEMENTEN */
-    h3 { margin: 0 0 10px 0; font-size: 14px; color: var(--accent); }
+    .stack-fliepel { position: absolute; width: 20px; height: 10px; left: calc(50% - 10px); top: calc(50% - 5px); background: #0088ff; border: 1px solid #0055cc; border-top: 1px solid #33aaff; border-radius: 2px; z-index: 6; pointer-events: none; box-shadow: 0 2px 5px rgba(0,0,0,0.6); display: none; align-items: center; justify-content: space-between; padding: 0 2px; }
+    .stack-fliepel::before, .stack-fliepel::after { content: ''; width: 4px; height: 4px; background: #222; border-radius: 50%; box-shadow: inset 1px 1px 1px #000, inset -1px -1px 1px #555; }
+
+    .rig-bar { position: absolute; height: 14px; top: -14px; background: linear-gradient(180deg, #444, #111); border: 1px solid #000; border-bottom: none; z-index: 5; box-shadow: 0 -3px 5px rgba(0,0,0,0.5); border-radius: 2px 2px 0 0; display: none; }
+    .rig-shackle { position: absolute; width: 16px; height: 20px; top: -34px; border: 4px solid #aaa; border-radius: 50% 50% 10% 10%; z-index: 6; box-shadow: 0 2px 4px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.4); display: none; transition: 0.2s; pointer-events: none; }
+    
+    .rig-weight-label { display: none; position: absolute; top: -60px; transform: translateX(-50%); font-size: 14px; font-weight: bold; background: rgba(0,0,0,0.85); color: #fff; padding: 4px 8px; border-radius: 4px; z-index: 50; pointer-events: none; text-align: center; line-height: 1.2; }
+    .rig-weight-label.safe { border: 1px solid var(--success); }
+    .rig-weight-label.danger { border: 1px solid var(--danger); color: var(--danger); }
+
+    .hw-active .rig-shackle { pointer-events: auto; cursor: pointer; }
+    .hw-active .rig-shackle:hover { filter: brightness(1.3) scale(1.1); transform-origin: bottom center; }
+
+    .show-hw-ui .stack-ladder, .export-hw-only .stack-ladder { display: block !important; }
+    .show-hw-ui .stack-base, .export-hw-only .stack-base { display: block !important; }
+    .show-hw-ui .stack-foot, .export-hw-only .stack-foot { display: block !important; }
+    .show-hw-ui .stack-fliepel, .export-hw-only .stack-fliepel { display: flex !important; }
+    .show-hw-ui .rig-bar, .export-hw-only .rig-bar { display: block !important; }
+    .show-hw-ui .rig-shackle, .export-hw-only .rig-shackle { display: block !important; }
+    .show-hw-ui .rig-weight-label, .export-hw-only .rig-weight-label { display: block !important; }
+
+    .data-cable { stroke-width: 4; fill: none; opacity: 1; pointer-events: none; filter: drop-shadow(0px 0px 3px rgba(0,0,0,0.8)); transition: stroke 0.3s; }
+    .power-cable { stroke-width: 5; fill: none; opacity: 0.9; pointer-events: none; stroke-dasharray: 6,6; filter: drop-shadow(0px 0px 3px rgba(0,0,0,0.8)); transition: stroke 0.3s; }
+    
+    h3 { margin: 0 0 10px 0; font-size: 13px; color: var(--accent); text-transform: uppercase; letter-spacing: 1px;}
     .form-group { margin-bottom: 10px; }
     .form-row { display: flex; gap: 10px; margin-bottom: 10px; }
-    label { display: block; margin-bottom: 4px; font-size: 11px; color: var(--text-muted); text-transform: uppercase; }
-    input, select { width: 100%; padding: 8px; background: #121214; border: 1px solid var(--border); color: white; border-radius: 4px; font-size: 13px; }
+    label { display: block; margin-bottom: 4px; font-size: 10px; color: var(--text-muted); text-transform: uppercase; font-weight: bold; }
+    input, select { width: 100%; padding: 8px; background: #0a0a0c; border: 1px solid var(--border); color: white; border-radius: 4px; font-size: 12px; outline: none; }
+    input:focus, select:focus { border-color: var(--accent); }
+    input[type=checkbox] { width: auto; transform: scale(1.2); cursor: pointer; }
     
-    button { width: 100%; padding: 10px; background: var(--accent); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 13px; transition: 0.2s; }
+    button { width: 100%; padding: 8px; background: var(--accent); color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 12px; transition: 0.2s; }
     button:hover { background: var(--accent-hover); }
     button.outline { background: transparent; border: 1px solid var(--accent); color: var(--accent); }
-    button.outline:hover { background: rgba(0, 122, 204, 0.1); }
+    button.outline:hover { background: rgba(0, 136, 255, 0.1); }
     button.danger { background: var(--danger); }
     button.danger:hover { background: #992600; }
+    button.success { background: var(--success); }
+    button.success:hover { background: #00aa77; }
+    button.action-btn { background: #333; color: white; border: 1px solid #555; padding: 12px; margin-bottom: 8px; font-size: 13px; }
+    button.action-btn:hover { background: #444; border-color: #777; }
 
-    .card { background: #121214; border: 1px solid var(--border); padding: 10px; border-radius: 4px; margin-bottom: 5px; }
-    .card-stat { font-size: 12px; color: var(--text-muted); display: flex; justify-content: space-between; margin-bottom: 2px; }
+    .card { background: #0a0a0c; border: 1px solid var(--border); padding: 12px; border-radius: 6px; margin-bottom: 5px; }
+    .card-stat { font-size: 12px; color: #ccc; display: flex; justify-content: space-between; margin-bottom: 4px; }
     
-    /* ACCORDION (Details) */
-    details { background: #1a1a1f; border: 1px solid var(--border); border-radius: 4px; padding: 10px; margin-bottom: 10px; }
-    summary { font-weight: bold; font-size: 13px; cursor: pointer; outline: none; margin: -10px; padding: 10px; color: var(--accent); }
-    details[open] summary { border-bottom: 1px solid var(--border); margin-bottom: 15px; }
+    .lib-item { display: flex; justify-content: space-between; align-items: center; background: #16161a; padding: 6px 10px; border: 1px solid var(--border); border-radius: 4px; margin-bottom: 5px; font-size: 11px;}
+    .lib-item button { width: auto; padding: 2px 8px; margin: 0; background: var(--danger); }
 
-    #zoom-controls { position: fixed; bottom: 20px; left: 360px; background: var(--bg-panel); padding: 10px 15px; border-radius: 20px; border: 1px solid var(--border); display: flex; align-items: center; gap: 10px; z-index: 20; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+    details { background: #16161a; border: 1px solid var(--border); border-radius: 6px; padding: 12px; margin-bottom: 5px; transition: 0.2s; }
+    summary { font-weight: 800; font-size: 12px; cursor: pointer; outline: none; margin: -12px; padding: 12px; color: #fff; display: block; }
+    summary::-webkit-details-marker { display: none; }
+    details[open] summary { border-bottom: 1px solid var(--border); margin-bottom: 15px; color: var(--accent); }
+
+    #zoom-controls { position: fixed; bottom: 20px; left: 360px; background: var(--bg-panel); padding: 10px 15px; border-radius: 8px; border: 1px solid var(--border); display: flex; align-items: center; gap: 10px; z-index: 100; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
+    
+    .patch-instruction { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%); color: #000; padding: 12px 25px; border-radius: 8px; font-weight: bold; font-size: 14px; z-index: 200; box-shadow: 0 10px 30px rgba(0,0,0,0.8); display: none; text-align: center; transition: background 0.3s; }
+    .patch-instruction.data { background: var(--success); }
+    .patch-instruction.power { background: var(--warning); }
+    .patch-instruction.layout { background: var(--accent); color: #fff; }
+    .patch-instruction.stack { background: #444; color: #fff; border: 1px solid #666; }
+
+    /* PDF EXPORT STYLES */
+    .export-screen-mode { background-color: #ffffff !important; background-image: none !important; border: none !important; box-shadow: none !important; }
+    .export-screen-mode .led-wall { outline: 2px solid #000 !important; box-shadow: none !important; }
+    .export-screen-mode .led-panel { background-color: #f4f6f8 !important; border-color: #000 !important; }
+    .export-screen-mode .d-text, .export-screen-mode .p-text { color: #000 !important; text-shadow: none !important; }
+    .export-screen-mode .coord-text { color: #333 !important; }
+    .export-screen-mode .data-cable, .export-screen-mode .power-cable { filter: none !important; } 
+    .export-screen-mode #canvas-size-label { display: none !important; }
+    .export-screen-mode .wall-title-giant { color: #e0e0e0; text-shadow: none; opacity: 0.6; } 
+    .export-screen-mode .patch-bg { background-color: #fff; border: 1px solid #ccc; box-shadow: none; }
+    
+    .export-data-only .power-cable, .export-data-only .power-marker, .export-data-only .p-text { display: none !important; }
+    .export-power-only .data-cable, .export-power-only .data-marker, .export-power-only .d-text { display: none !important; }
+    .export-png-mode .d-text, .export-png-mode .p-text { display: none !important; }
+    
+    .export-hw-only .data-cable, .export-hw-only .data-marker, .export-hw-only .d-text { display: none !important; }
+    .export-hw-only .power-cable, .export-hw-only .power-marker, .export-hw-only .p-text { display: none !important; }
+    .export-hw-only .patch-bg { display: none !important; }
+
+    .wall-legend { display: none; position: absolute; background: #fff; color: #000; border: 2px solid #000; padding: 12px; border-radius: 4px; box-shadow: 5px 5px 0px rgba(0,0,0,0.1); font-size: 12px; text-align: left; z-index: 1000; white-space: nowrap; font-family: monospace; }
+    .export-screen-mode .wall-legend { display: block; }
+    .export-data-only .legend-power { display: none; }
+    .export-power-only .legend-data { display: none; }
+    .export-hw-only .legend-data, .export-hw-only .legend-power { display: none; }
+    
+    .color-box { display: inline-block; width: 14px; height: 14px; border: 1px solid #000; vertical-align: middle; margin-right: 6px; }
   </style>
 </head>
 <body>
 
-  <!-- LINKER ZIJBALK: INVOER & INSTELLINGEN -->
+  <!-- LOGIN OVERLAY -->
+  <div id="login-overlay">
+    <div class="login-box">
+        <h2>Pixelmap by MTR</h2>
+        <p style="color:var(--text-muted); margin-bottom:20px;">Voer de toegangscode in om te starten.</p>
+        <input type="password" id="pin-code" placeholder="***" style="width:150px; text-align:center; font-size:24px; letter-spacing:10px; padding:10px; margin-bottom:15px; border:2px solid #333; background:#000; border-radius:8px;">
+        <button onclick="checkLogin()" style="width:150px; padding:12px; font-size:16px;">Inloggen</button>
+        <p id="login-error" style="color:var(--danger); display:none; margin-top:15px; font-weight:bold;">Onjuiste code.</p>
+    </div>
+  </div>
+
+  <div id="patch-instruction" class="patch-instruction"></div>
+
   <div id="sidebar-left">
-    <div class="panel-header">Bouw & Instellingen</div>
+    <div class="panel-header">Pixelmap by MTR</div>
     <div class="panel-content">
-      
-      <!-- Canvas Instellingen -->
       <details open>
-        <summary>1. Canvas Resolutie</summary>
+        <summary>1. Project Informatie</summary>
+        <div class="form-group"><label>Projectnaam</label><input type="text" id="pi_name" placeholder="Bijv. Mainstage Festival" onchange="saveAppCloudState()"></div>
+        <div class="form-group"><label>Locatie</label><input type="text" id="pi_loc" placeholder="Locatie (Bijv. Ahoy)" onchange="saveAppCloudState()"></div>
         <div class="form-row">
-          <div class="form-group"><label>Breedte (px)</label><input type="number" id="canW" value="3840"></div>
-          <div class="form-group"><label>Hoogte (px)</label><input type="number" id="canH" value="2160"></div>
+          <div class="form-group"><label>Datum</label><input type="date" id="pi_date" onchange="saveAppCloudState()"></div>
+          <div class="form-group"><label>Getekend door</label><input type="text" id="pi_tech" placeholder="Jouw naam" onchange="saveAppCloudState()"></div>
         </div>
-        <button class="outline" onclick="updateCanvasSize()">Pas Resolutie Toe</button>
       </details>
 
-      <!-- Bibliotheek Beheer (Nu Uitklapbaar!) -->
       <details>
-        <summary>2. Bibliotheek Toevoegen</summary>
+        <summary>2. Canvas Formaat (Pixels)</summary>
+        <div class="form-row">
+          <div class="form-group"><label>Breedte (px)</label><input type="number" id="canW" value="3840" onchange="updateCanvasSize(); saveAppCloudState();"></div>
+          <div class="form-group"><label>Hoogte (px)</label><input type="number" id="canH" value="2160" onchange="updateCanvasSize(); saveAppCloudState();"></div>
+        </div>
+      </details>
+
+      <details id="details_lib">
+        <summary>3. Bibliotheek Toevoegen</summary>
         <div class="form-row">
           <select id="libTypeSwitcher" onchange="toggleLibForms()">
-            <option value="led">Nieuw LED Paneel Toevoegen</option>
-            <option value="proc">Nieuwe Processor Toevoegen</option>
+            <option value="led">Nieuw / Edit LED Paneel</option>
+            <option value="proc">Nieuwe / Edit Processor</option>
           </select>
         </div>
         
         <div id="form-led">
-          <input type="text" id="nl_name" placeholder="Naam (bijv. ROE BP2)" class="form-group">
+          <input type="text" id="nl_name" placeholder="Naam (bijv. ROE BM4)" class="form-group">
+          
+          <h4 style="margin:0 0 5px 0; color:var(--text-muted); font-size: 10px; text-transform:uppercase;">Fysieke Afmeting</h4>
           <div class="form-row">
-            <div class="form-group"><label>Px Breed</label><input type="number" id="nl_w" value="176"></div>
-            <div class="form-group"><label>Px Hoog</label><input type="number" id="nl_h" value="176"></div>
+            <div class="form-group"><label>Breed (mm)</label><input type="number" id="nl_physW" value="1000"></div>
+            <div class="form-group"><label>Hoog (mm)</label><input type="number" id="nl_physH" value="500"></div>
           </div>
+          
+          <h4 style="margin:0 0 5px 0; color:var(--text-muted); font-size: 10px; text-transform:uppercase;">Resolutie (Pixels)</h4>
           <div class="form-row">
-            <div class="form-group"><label>Watt (Max)</label><input type="number" id="nl_watt" value="160"></div>
-            <div class="form-group"><label>Gewicht (kg)</label><input type="number" id="nl_kg" value="8.5" step="0.1"></div>
+            <div class="form-group"><label>Pixels Breed</label><input type="number" id="nl_pxW" value="256"></div>
+            <div class="form-group"><label>Pixels Hoog</label><input type="number" id="nl_pxH" value="128"></div>
           </div>
-          <button class="outline" onclick="saveNewLed()">Opslaan in Bieb</button>
+          
+          <div class="form-row">
+            <div class="form-group"><label>Watt (Max)</label><input type="number" id="nl_watt" value="240"></div>
+            <div class="form-group"><label>Gewicht (kg)</label><input type="number" id="nl_kg" value="14.0" step="0.1"></div>
+          </div>
+          
+          <div class="form-group" style="display:flex; align-items:center; gap:10px; margin-top:10px; border-top:1px solid #333; padding-top:10px;">
+            <input type="checkbox" id="nl_has_alt" onchange="document.getElementById('form-led-alt').style.display = this.checked ? 'block' : 'none';">
+            <label style="margin:0; font-size:11px; cursor:pointer;" for="nl_has_alt">Heeft Kleiner Alt-Formaat</label>
+          </div>
+          
+          <div id="form-led-alt" style="display:none; background:rgba(0,136,255,0.05); border-left:2px solid var(--accent); padding:10px; margin-bottom:10px;">
+            <div class="form-row">
+              <div class="form-group"><label>Alt Breed (mm)</label><input type="number" id="nla_physW" value="500"></div>
+              <div class="form-group"><label>Alt Hoog (mm)</label><input type="number" id="nla_physH" value="500"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Alt Px Breed</label><input type="number" id="nla_pxW" value="128"></div>
+              <div class="form-group"><label>Alt Px Hoog</label><input type="number" id="nla_pxH" value="128"></div>
+            </div>
+            <div class="form-row">
+              <div class="form-group"><label>Alt Watt</label><input type="number" id="nla_watt" value="120"></div>
+              <div class="form-group"><label>Alt Gew (kg)</label><input type="number" id="nla_kg" value="7.0" step="0.1"></div>
+            </div>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button onclick="saveNewLed()" id="btn_save_led">Toevoegen</button>
+            <button class="outline" onclick="cancelLedEdit()" id="btn_cancel_led" style="display:none;">Annuleren</button>
+          </div>
         </div>
 
         <div id="form-proc" style="display:none;">
-          <input type="text" id="np_name" placeholder="Naam (bijv. MX2000)" class="form-group">
+          <input type="text" id="np_name" placeholder="Naam (bijv. MX2000 of MCTRL)" class="form-group">
           <div class="form-row">
+            <div class="form-group">
+              <label>Uitgang Type</label>
+              <select id="np_type" onchange="document.getElementById('np_fib_opt').style.display = this.value === 'fiber' ? 'flex' : 'none'; document.getElementById('np_rj_opt').style.display = this.value === 'fiber' ? 'none' : 'flex';">
+                <option value="fiber">Fiber Boxen (CVT)</option>
+                <option value="rj45">Direct (RJ45)</option>
+              </select>
+            </div>
             <div class="form-group"><label>Max Px / Poort</label><input type="number" id="np_px" value="650000"></div>
-            <div class="form-group"><label>Aantal Poorten</label><input type="number" id="np_ports" value="20"></div>
           </div>
-          <button class="outline" onclick="saveNewProcessor()">Opslaan in Bieb</button>
+          <div class="form-row" id="np_rj_opt" style="display:none;">
+            <div class="form-group"><label>Aantal RJ45 Poorten</label><input type="number" id="np_ports" value="16"></div>
+          </div>
+          <div class="form-row" id="np_fib_opt">
+            <div class="form-group"><label>Aantal Fibers</label><input type="number" id="np_fibers" value="4"></div>
+            <div class="form-group"><label>Poorten per Fiber</label><input type="number" id="np_ports_per_fiber" value="10"></div>
+          </div>
+          <div style="display:flex; gap:10px;">
+            <button onclick="saveNewProcessor()" id="btn_save_proc">Toevoegen</button>
+            <button class="outline" onclick="cancelProcEdit()" id="btn_cancel_proc" style="display:none;">Annuleren</button>
+          </div>
         </div>
       </details>
 
-      <!-- Scherm Bouwen -->
-      <details open style="border-color: var(--accent);">
-        <summary>3. Scherm Plaatsen</summary>
-        
-        <div class="form-group">
-          <label>Scherm Naam (Optioneel)</label>
-          <input type="text" id="wall_name" placeholder="Bijv. Main Stage, DJ Booth...">
-        </div>
-
-        <div class="form-group">
-          <label>LED Type (Kies uit bieb)</label>
-          <select id="wall_led"></select>
+      <details id="details_wall" open style="border-color: var(--accent);">
+        <summary>4. Scherm Plaatsen</summary>
+        <div class="form-group"><label>Scherm Naam</label><input type="text" id="wall_name" placeholder="Optioneel..."></div>
+        <div class="form-group"><label>LED Type (Basis Formaat)</label><select id="wall_led"></select></div>
+        <div class="form-row">
+          <div class="form-group"><label>Panelen B</label><input type="number" id="wall_cols" value="4"></div>
+          <div class="form-group"><label>Panelen H</label><input type="number" id="wall_rows" value="3"></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>Panelen Breed</label><input type="number" id="wall_cols" value="4"></div>
-          <div class="form-group"><label>Panelen Hoog</label><input type="number" id="wall_rows" value="3"></div>
+          <div class="form-group"><label>X Positie</label><input type="number" id="wall_x" value="0"></div>
+          <div class="form-group"><label>Y Positie</label><input type="number" id="wall_y" value="0"></div>
         </div>
-        <div class="form-row">
-          <div class="form-group"><label>X Positie</label><input type="number" id="wall_x" value="100"></div>
-          <div class="form-group"><label>Y Positie</label><input type="number" id="wall_y" value="100"></div>
+        <div style="display:flex; gap:10px;">
+          <button onclick="addWall()" id="btn_save_wall">Zet op Canvas</button>
+          <button class="outline" onclick="cancelWallEdit()" id="btn_cancel_wall" style="display:none;">Annuleren</button>
         </div>
-        <button onclick="addWall()">Zet op Canvas</button>
       </details>
-
+      
+      <details>
+        <summary>5. Bibliotheek Beheren</summary>
+        <h4 style="margin:0 0 5px 0; color:var(--text-muted); font-size: 10px; text-transform:uppercase;">LED Panelen</h4>
+        <div id="manage_leds" style="margin-bottom: 15px;"></div>
+        <h4 style="margin:0 0 5px 0; color:var(--text-muted); font-size: 10px; text-transform:uppercase;">Processoren</h4>
+        <div id="manage_procs"></div>
+      </details>
     </div>
   </div>
 
-  <!-- MIDDEN: WORKSPACE -->
   <div id="workspace">
-    <!-- Wrapper zorgt dat inzoomen netjes werkt zonder de scroll te breken -->
     <div id="canvas-wrapper">
       <div id="canvas-container">
+        <div id="wall-layer"></div>
         <svg id="cable-layer"></svg>
-        <!-- HTML Muren komen hier -->
+        <div id="text-layer"></div>
+        <div id="canvas-size-label"></div>
       </div>
     </div>
     
     <div id="zoom-controls">
-      <span style="font-size:12px; color:var(--text-muted);">Zoom</span>
-      <input type="range" id="zoom" min="0.1" max="2" step="0.1" value="0.5" oninput="applyZoom(this.value)">
-      <button onclick="toggleCables()" class="outline" style="padding: 5px 10px; width:auto; margin:0;">Toon Kabels</button>
+      <span style="font-size:12px; color:var(--text-muted);">View:</span>
+      <select id="cableViewMode" onchange="renderCanvas()" style="width:auto; margin:0; padding:4px;">
+        <option value="none">Geen Kabels</option>
+        <option value="data">Alleen Data</option>
+        <option value="power">Alleen Stroom</option>
+        <option value="hardware">Alleen Hardware</option>
+        <option value="both" selected>Data & Stroom</option>
+      </select>
+      <span style="font-size:12px; color:var(--text-muted); margin-left:10px;">Zoom</span>
+      <input type="range" id="zoom" min="0.1" max="2" step="0.1" value="1.0" oninput="applyZoom(this.value)">
     </div>
   </div>
 
-  <!-- RECHTER ZIJBALK: STATISTIEKEN & KABELS -->
   <div id="sidebar-right">
     <div class="panel-header">Calculaties & Schema</div>
     <div class="panel-content">
-      
       <div class="card">
-        <h3>Algemene Setup</h3>
-        <div class="form-group">
-          <label>Processor Type</label>
-          <select id="active_proc" onchange="calculateSchema()"></select>
-        </div>
-        <div class="form-group">
-          <label>Stroomaansluiting</label>
-          <select id="active_power" onchange="calculateSchema()">
-            <option value="3680">Schuko 16A (3680W)</option>
-            <option value="7360">CEE 32A (7360W per fase)</option>
-          </select>
+        <h3>Processoren in Project</h3>
+        <div id="project-procs-list"></div>
+        <div style="display:flex; gap:5px; margin-top:10px;">
+          <select id="add_project_proc_sel" style="flex:1; padding:4px;"></select>
+          <button class="outline" onclick="addProjectProc()" style="width:auto; padding:4px 8px;">+ Toevoeg</button>
         </div>
       </div>
 
-      <div class="card" style="background: rgba(0, 204, 136, 0.1); border-color: var(--success);">
-        <h3 style="color: var(--success);">Project Totalen</h3>
-        <div class="card-stat"><span>Totaal Pixels:</span> <span id="tot_px">0</span></div>
-        <div class="card-stat"><span>Totaal Gewicht:</span> <span id="tot_kg">0 kg</span></div>
-        <div class="card-stat"><span>Stroom (Max):</span> <span id="tot_w">0 W</span></div>
-        <hr style="border-color: var(--border); margin: 8px 0;">
-        <div class="card-stat"><strong style="color:white;">Data Poorten:</strong> <span id="req_ports" style="font-weight:bold; color:white;">0</span></div>
-        <div class="card-stat"><strong style="color:white;">Stroomgroepen:</strong> <span id="req_power" style="font-weight:bold; color:white;">0</span></div>
+      <div class="card" style="background: rgba(0, 204, 136, 0.05); border-color: var(--success);">
+        <h3 style="color: var(--success);">Totaal Overzicht</h3>
+        <div class="card-stat"><span>Pixels (Fysiek):</span> <span id="tot_px" style="color:#fff; font-weight:bold;">0</span></div>
+        <div class="card-stat"><span>Totaal Gewicht:</span> <span id="tot_kg" style="color:#fff;">0 kg</span></div>
+        <div class="card-stat"><span style="color: var(--danger); font-weight:bold;">Tegels OOB:</span> <span id="tot_oob" style="color: var(--danger); font-weight:bold;">0</span></div>
       </div>
 
-      <h3 style="margin-top: 10px;">Lijst met Schermen</h3>
-      <div id="wall-list-container">
-        <!-- Gegenereerde lijst met schermen komt hier -->
+      <div class="card">
+        <h3 style="color: #888;">Hardware / Rigging</h3>
+        <div class="card-stat"><span>Ladders (1m / 0.5m):</span> <span id="tot_stack" style="color:#fff;">0 / 0</span></div>
+        <div class="card-stat"><span>Bumperbars (2x / 1x):</span> <span id="tot_bars" style="color:#fff;">0 / 0</span></div>
+        <div class="card-stat"><span>Voetjes / Hijsogen:</span> <span id="tot_feet_eyes" style="color:#fff;">0 / 0</span></div>
+        <div class="card-stat"><span>Bases / Fliepels:</span> <span id="tot_bases_fliepels" style="color:#fff;">0 / 0</span></div>
+        <div class="card-stat"><span>Links (Eth / True1):</span> <span id="tot_links" style="color:#fff;">0 / 0</span></div>
       </div>
 
+      <div class="card">
+        <h3 style="color: var(--warning);">Fase Verdeling (3600W/Gr)</h3>
+        <div class="card-stat"><span>L1 (Rood):</span> <span id="pwr_l1" style="color:var(--phase-l1); font-weight:bold;">0 W (0 gr)</span></div>
+        <div class="card-stat"><span>L2 (Blauw):</span> <span id="pwr_l2" style="color:var(--phase-l2); font-weight:bold;">0 W (0 gr)</span></div>
+        <div class="card-stat"><span>L3 (Geel):</span> <span id="pwr_l3" style="color:var(--phase-l3); font-weight:bold;">0 W (0 gr)</span></div>
+        <div class="card-stat" style="margin-top:5px; border-top:1px solid #333; padding-top:5px;"><strong>Totaal Stroom:</strong> <span id="tot_w" style="font-weight:bold; color:#fff;">0 W</span></div>
+      </div>
+
+      <h3 style="margin-top: 10px;">Schermenlijst</h3>
+      <div id="wall-list-container"></div>
+
+      <button class="action-btn pdf-btn" id="btn-pdf" onclick="generatePDF()">📄 Genereer PDF Werktekening & Pakbon</button>
+      <button class="action-btn" id="btn-png" onclick="generatePNG(false)">🖼️ Exporteer PNG (Pixelmap Masker)</button>
+      <button class="action-btn" id="btn-png-cables" onclick="generatePNG(true)" style="margin-top: 0;">🖼️ Exporteer PNG (Met Kabels)</button>
     </div>
   </div>
 
   <script>
-    // --- LOKALE DATABASE ---
-    let db = {
-      leds: JSON.parse(localStorage.getItem('pixelmap_leds')) || [
-        { id: 'roe_bp2', name: 'ROE BP2V2', w: 176, h: 176, watt: 160, kg: 8.5 },
-        { id: 'abs_p3', name: 'Absen P3.9', w: 128, h: 128, watt: 120, kg: 7.0 }
-      ],
-      procs: JSON.parse(localStorage.getItem('pixelmap_procs')) || [
-        { id: 'mx2000', name: 'Novastar MX2000', px: 650000, ports: 20 },
-        { id: 'vx4s', name: 'Novastar VX4S', px: 650000, ports: 4 }
-      ]
+    // --- SUPABASE CLOUD SETUP ---
+    const supabaseUrl = 'https://gjpoebdsyvqtxyazwmxp.supabase.co';
+    const supabaseKey = 'sb_publishable_PEUhiXzgdLhaaGdnsipBQQ_snAHkGfD';
+    const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
+
+    let isLoggedIn = sessionStorage.getItem('pixelmap_auth') === 'true';
+
+    let defaultLeds = [
+        { id: 'roe_bp2', name: 'ROE BP2V2', physW: 500, physH: 500, pxW: 176, pxH: 176, watt: 160, kg: 8.5, hasAlt: false }, 
+        { id: 'abs_p3', name: 'Absen P3.9 (Mix)', physW: 1000, physH: 500, pxW: 256, pxH: 128, watt: 240, kg: 14.0, hasAlt: true, altPhysW: 500, altPhysH: 500, altPxW: 128, altPxH: 128, altWatt: 120, altKg: 7.0 }
+    ];
+
+    let db = { leds: [...defaultLeds], procs: [] };
+    let projectProcs = [];
+    let walls = [];
+
+    // Verberg auth check if already logged in
+    if(isLoggedIn) {
+        document.getElementById('login-overlay').style.display = 'none';
+        initAppFromCloud();
+    }
+
+    window.checkLogin = function() {
+        if(document.getElementById('pin-code').value === '666') {
+            sessionStorage.setItem('pixelmap_auth', 'true');
+            isLoggedIn = true;
+            document.getElementById('login-overlay').style.display = 'none';
+            initAppFromCloud();
+        } else {
+            document.getElementById('login-error').style.display = 'block';
+        }
+    }
+
+    async function initAppFromCloud() {
+        try {
+            const { data, error } = await supabaseClient.from('pixelmap_app_state').select('*');
+            if (error) throw error;
+            
+            if (data && data.length > 0) {
+                data.forEach(row => {
+                    if (row.state_key === 'leds') db.leds = row.state_value.length > 0 ? row.state_value : [...defaultLeds];
+                    if (row.state_key === 'procs') db.procs = row.state_value || [];
+                    if (row.state_key === 'proj_procs') projectProcs = row.state_value || [];
+                    if (row.state_key === 'walls') {
+                        // Restore class logic if needed
+                        walls = row.state_value.map(w => {
+                            w.splitTiles = w.splitTiles || [];
+                            w.mount = w.mount || 'hang';
+                            w.stack = w.stack || { ladders_1m: [], ladders_05m: [], bases: [], fliepels: [] };
+                            if(!w.activeHangPoints) w.activeHangPoints = Array.from({length: w.cols}, (_, i) => i);
+                            return w;
+                        });
+                    }
+                    if (row.state_key === 'project_info') {
+                        document.getElementById('pi_name').value = row.state_value.name || '';
+                        document.getElementById('pi_loc').value = row.state_value.loc || '';
+                        document.getElementById('pi_date').value = row.state_value.date || '';
+                        document.getElementById('pi_tech').value = row.state_value.tech || '';
+                        document.getElementById('canW').value = row.state_value.canW || 3840;
+                        document.getElementById('canH').value = row.state_value.canH || 2160;
+                    }
+                });
+            }
+            
+            // Zorg dat er altijd 1 processor is
+            if (projectProcs.length === 0 && db.procs.length > 0) { 
+                projectProcs.push({ id: 'p_'+Date.now(), dbId: db.procs[0].id }); 
+                saveAppCloudState(); 
+            }
+            
+            updateCanvasSize(); 
+            document.getElementById('zoom').value = 0.2;
+            applyZoom(0.2); 
+            refreshDropdowns();
+            renderCanvas();
+        } catch(err) {
+            console.error("Supabase laadfout:", err);
+            alert("Let op: kon data niet inladen vanuit de cloud. Controleer database tabel setup.");
+        }
+    }
+
+    // Centrale opslag functie naar Supabase
+    window.saveAppCloudState = async function() {
+        if (!isLoggedIn) return;
+        let projInfo = {
+            name: document.getElementById('pi_name').value,
+            loc: document.getElementById('pi_loc').value,
+            date: document.getElementById('pi_date').value,
+            tech: document.getElementById('pi_tech').value,
+            canW: parseInt(document.getElementById('canW').value),
+            canH: parseInt(document.getElementById('canH').value)
+        };
+        
+        try {
+            await Promise.all([
+                supabaseClient.from('pixelmap_app_state').update({ state_value: db.leds }).eq('state_key', 'leds'),
+                supabaseClient.from('pixelmap_app_state').update({ state_value: db.procs }).eq('state_key', 'procs'),
+                supabaseClient.from('pixelmap_app_state').update({ state_value: projectProcs }).eq('state_key', 'proj_procs'),
+                supabaseClient.from('pixelmap_app_state').update({ state_value: walls }).eq('state_key', 'walls'),
+                supabaseClient.from('pixelmap_app_state').update({ state_value: projInfo }).eq('state_key', 'project_info')
+            ]);
+        } catch(err) {
+            console.error("Oeps, cloud sync mislukt:", err);
+        }
+    };
+    // --- EINDE SUPABASE SETUP ---
+
+    const MAX_POWER_PER_GROUP = 3600;
+    let activePatchWall = null; 
+    let activePatchType = null; 
+    let activeStackTool = 'base'; 
+    let isPatchDragging = false; 
+    let lastDraggedTileStr = null; 
+    window.patchDrawAction = null;
+
+    let editingLedId = null;
+    let editingProcId = null;
+    let editingWallIndex = null;
+
+    let bomTotals = { px:0, kg:0, watt:0, l1m:0, l05m:0, bases:0, feet:0, fliepels:0, bars1:0, bars2:0, activeShackles:0, ethercon:0, powercon:0, ledTypes:{}, procTypes:{} };
+
+    window.setActiveStackTool = function(val) { activeStackTool = val; renderCanvas(); };
+
+    const workspace = document.getElementById('workspace');
+    let isPanning = false; let startX, startY, scrollLeft, scrollTop;
+
+    workspace.addEventListener('mousedown', (e) => {
+      if(e.target !== workspace && e.target.id !== 'canvas-wrapper' && e.target.id !== 'canvas-container' && !e.target.classList.contains('oob-tint')) return;
+      isPanning = true; workspace.classList.add('dragging');
+      startX = e.pageX - workspace.offsetLeft; startY = e.pageY - workspace.offsetTop;
+      scrollLeft = workspace.scrollLeft; scrollTop = workspace.scrollTop;
+    });
+    workspace.addEventListener('mouseleave', () => { isPanning = false; workspace.classList.remove('dragging'); });
+    window.addEventListener('mouseup', () => { isPanning = false; workspace.classList.remove('dragging'); isPatchDragging = false; lastDraggedTileStr = null; window.patchDrawAction = null; });
+    workspace.addEventListener('mousemove', (e) => { if(isPanning) { e.preventDefault(); const x = e.pageX - workspace.offsetLeft; const y = e.pageY - workspace.offsetTop; workspace.scrollLeft = scrollLeft - ((x - startX) * 1.5); workspace.scrollTop = scrollTop - ((y - startY) * 1.5); } });
+
+    window.addEventListener('mousemove', (e) => {
+        if (!isPatchDragging || activePatchWall === null || activePatchType === 'rigging') return;
+        const els = document.elementsFromPoint(e.clientX, e.clientY);
+        const panel = els.find(el => el.classList && el.classList.contains('led-panel'));
+        if (panel && panel.dataset.id) {
+            const tileStr = panel.dataset.id; const wIdx = parseInt(panel.dataset.w);
+            if (tileStr !== lastDraggedTileStr && wIdx === activePatchWall) { lastDraggedTileStr = tileStr; window.handleTileClick(wIdx, tileStr); }
+        }
+    });
+
+    window.addEventListener('keydown', (e) => {
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA') return;
+        if (activePatchWall === null || activePatchType === null || activePatchType === 'layout' || activePatchType === 'stackframe' || activePatchType === 'rigging') return;
+        const wall = walls[activePatchWall]; const panels = getWallPanels(wall); 
+
+        let pathArray = [];
+        if (activePatchType === 'data') {
+            let pIdx = parseInt(document.getElementById('draw-proc-sel').value); let port = parseInt(document.getElementById('draw-port-sel').value);
+            let pathObj = wall.customData.find(p => p.procIdx === pIdx && p.port === port); if(pathObj) pathArray = pathObj.tiles;
+        } else {
+            let grp = parseInt(document.getElementById('draw-group-sel').value);
+            let pathObj = wall.customPower.find(p => p.group === grp); if(pathObj) pathArray = pathObj.tiles;
+        }
+        if (!pathArray || pathArray.length === 0) return;
+
+        const lastTileId = pathArray[pathArray.length - 1]; let prevTileId = pathArray.length > 1 ? pathArray[pathArray.length - 2] : null;
+        const currentP = panels.find(p => p.id === lastTileId); if (!currentP) return;
+
+        let dir = e.key; if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(dir)) return;
+        e.preventDefault();
+
+        let candidates = [];
+        if(dir === 'ArrowUp') candidates = panels.filter(p => p.y < currentP.y && p.x < currentP.x + currentP.w && p.x + p.w > currentP.x);
+        if(dir === 'ArrowDown') candidates = panels.filter(p => p.y > currentP.y && p.x < currentP.x + currentP.w && p.x + p.w > currentP.x);
+        if(dir === 'ArrowLeft') candidates = panels.filter(p => p.x < currentP.x && p.y < currentP.y + currentP.h && p.y + p.h > currentP.y);
+        if(dir === 'ArrowRight') candidates = panels.filter(p => p.x > currentP.x && p.y < currentP.y + currentP.h && p.y + p.h > currentP.y);
+
+        if (candidates.length === 0) return;
+        candidates.sort((a,b) => { let distA = Math.pow(a.x - currentP.x, 2) + Math.pow(a.y - currentP.y, 2); let distB = Math.pow(b.x - currentP.x, 2) + Math.pow(b.y - currentP.y, 2); return distA - distB; });
+
+        let nextTileId = candidates[0].id;
+        if (prevTileId && prevTileId === nextTileId) { window.undoPatch(); } else { window.handleTileClick(activePatchWall, nextTileId); }
+    });
+
+    function formatPortLabel(conf, portNum, short = false) {
+        if (conf && conf.isFiber) { let f = Math.ceil(portNum / conf.portsPerFiber); let p = portNum % conf.portsPerFiber || conf.portsPerFiber; return short ? `F${f}.${p}` : `F${f}-P${p}`; }
+        return portNum;
+    }
+
+    function toggleLibForms() { document.getElementById('form-led').style.display = document.getElementById('libTypeSwitcher').value === 'led' ? 'block' : 'none'; document.getElementById('form-proc').style.display = document.getElementById('libTypeSwitcher').value === 'proc' ? 'block' : 'none'; }
+    window.updateCanvasSize = function() { document.getElementById('canvas-container').style.width = document.getElementById('canW').value + 'px'; document.getElementById('canvas-container').style.height = document.getElementById('canH').value + 'px'; document.getElementById('canvas-size-label').innerText = `${document.getElementById('canW').value} X ${document.getElementById('canH').value} PX`; renderCanvas(); };
+    window.applyZoom = function(val) { document.getElementById('canvas-wrapper').style.transform = `scale(${val})`; };
+    
+    function refreshDropdowns() {
+      document.getElementById('wall_led').innerHTML = ''; db.leds.forEach(l => document.getElementById('wall_led').innerHTML += `<option value="${l.id}">${l.name} (${l.physW}x${l.physH}mm, ${l.pxW}x${l.pxH}px)</option>`);
+      document.getElementById('add_project_proc_sel').innerHTML = ''; db.procs.forEach(p => document.getElementById('add_project_proc_sel').innerHTML += `<option value="${p.id}">${p.name}</option>`);
+      document.getElementById('manage_leds').innerHTML = ''; 
+      db.leds.forEach(l => { document.getElementById('manage_leds').innerHTML += `<div class="lib-item"><span>${l.name}</span> <div><button onclick="editLed('${l.id}')" style="background:var(--accent); margin-right:5px; padding:2px 6px; border:none; color:white; border-radius:3px; cursor:pointer;">✏️</button><button onclick="deleteLed('${l.id}')">X</button></div></div>`; });
+      document.getElementById('manage_procs').innerHTML = ''; 
+      db.procs.forEach(p => { document.getElementById('manage_procs').innerHTML += `<div class="lib-item"><span>${p.name}</span> <div><button onclick="editProc('${p.id}')" style="background:var(--accent); margin-right:5px; padding:2px 6px; border:none; color:white; border-radius:3px; cursor:pointer;">✏️</button><button onclick="deleteProc('${p.id}')">X</button></div></div>`; });
+    }
+
+    window.editLed = function(id) {
+        const led = db.leds.find(l => l.id === id); if(!led) return; editingLedId = id; document.getElementById('details_lib').open = true; document.getElementById('libTypeSwitcher').value = 'led'; toggleLibForms();
+        document.getElementById('nl_name').value = led.name; document.getElementById('nl_physW').value = led.physW; document.getElementById('nl_physH').value = led.physH; document.getElementById('nl_pxW').value = led.pxW; document.getElementById('nl_pxH').value = led.pxH; document.getElementById('nl_watt').value = led.watt; document.getElementById('nl_kg').value = led.kg; document.getElementById('nl_has_alt').checked = led.hasAlt; document.getElementById('form-led-alt').style.display = led.hasAlt ? 'block' : 'none';
+        if(led.hasAlt) { document.getElementById('nla_physW').value = led.altPhysW; document.getElementById('nla_physH').value = led.altPhysH; document.getElementById('nla_pxW').value = led.altPxW; document.getElementById('nla_pxH').value = led.altPxH; document.getElementById('nla_watt').value = led.altWatt; document.getElementById('nla_kg').value = led.altKg; }
+        document.getElementById('btn_save_led').innerText = 'Update Paneel'; document.getElementById('btn_cancel_led').style.display = 'block'; document.getElementById('nl_name').scrollIntoView();
+    };
+    window.cancelLedEdit = function() { editingLedId = null; document.getElementById('nl_name').value = ''; document.getElementById('btn_save_led').innerText = 'Toevoegen'; document.getElementById('btn_cancel_led').style.display = 'none'; };
+
+    window.editProc = function(id) {
+        const proc = db.procs.find(p => p.id === id); if(!proc) return; editingProcId = id; document.getElementById('details_lib').open = true; document.getElementById('libTypeSwitcher').value = 'proc'; toggleLibForms();
+        document.getElementById('np_name').value = proc.name; document.getElementById('np_px').value = proc.px; document.getElementById('np_type').value = proc.isFiber ? 'fiber' : 'rj45'; document.getElementById('np_fib_opt').style.display = proc.isFiber ? 'flex' : 'none'; document.getElementById('np_rj_opt').style.display = proc.isFiber ? 'none' : 'flex';
+        if (proc.isFiber) { document.getElementById('np_fibers').value = proc.fibers; document.getElementById('np_ports_per_fiber').value = proc.portsPerFiber; } else { document.getElementById('np_ports').value = proc.ports; }
+        document.getElementById('btn_save_proc').innerText = 'Update Processor'; document.getElementById('btn_cancel_proc').style.display = 'block'; document.getElementById('np_name').scrollIntoView();
+    };
+    window.cancelProcEdit = function() { editingProcId = null; document.getElementById('np_name').value = ''; document.getElementById('btn_save_proc').innerText = 'Toevoegen'; document.getElementById('btn_cancel_proc').style.display = 'none'; };
+
+    window.editWall = function(index) {
+        const wall = walls[index]; editingWallIndex = index; document.getElementById('details_wall').open = true;
+        document.getElementById('wall_name').value = wall.id; document.getElementById('wall_led').value = wall.led.id; document.getElementById('wall_cols').value = wall.cols; document.getElementById('wall_rows').value = wall.rows; document.getElementById('wall_x').value = wall.x; document.getElementById('wall_y').value = wall.y;
+        document.getElementById('btn_save_wall').innerText = 'Update Scherm'; document.getElementById('btn_cancel_wall').style.display = 'block'; document.getElementById('wall_name').scrollIntoView();
+    };
+    window.cancelWallEdit = function() { editingWallIndex = null; document.getElementById('wall_name').value = ''; document.getElementById('btn_save_wall').innerText = 'Zet op Canvas'; document.getElementById('btn_cancel_wall').style.display = 'none'; };
+
+    window.addProjectProc = function() { const dbId = document.getElementById('add_project_proc_sel').value; if (!dbId) return; projectProcs.push({ id: 'p_'+Date.now(), dbId: dbId }); saveAppCloudState(); renderCanvas(); };
+    window.removeProjectProc = function(idx) { if (projectProcs.length <= 1) return alert("Houd minimaal 1 processor in je project."); projectProcs.splice(idx, 1); saveAppCloudState(); renderCanvas(); };
+
+    window.saveNewLed = function() { 
+        const hasAlt = document.getElementById('nl_has_alt').checked;
+        const led = { 
+            id: editingLedId ? editingLedId : 'led_' + Date.now(), name: document.getElementById('nl_name').value, 
+            physW: parseInt(document.getElementById('nl_physW').value), physH: parseInt(document.getElementById('nl_physH').value), 
+            pxW: parseInt(document.getElementById('nl_pxW').value), pxH: parseInt(document.getElementById('nl_pxH').value), 
+            watt: parseInt(document.getElementById('nl_watt').value), kg: parseFloat(document.getElementById('nl_kg').value),
+            hasAlt: hasAlt, 
+            altPhysW: hasAlt ? parseInt(document.getElementById('nla_physW').value) : 0, altPhysH: hasAlt ? parseInt(document.getElementById('nla_physH').value) : 0,
+            altPxW: hasAlt ? parseInt(document.getElementById('nla_pxW').value) : 0, altPxH: hasAlt ? parseInt(document.getElementById('nla_pxH').value) : 0,
+            altWatt: hasAlt ? parseInt(document.getElementById('nla_watt').value) : 0, altKg: hasAlt ? parseFloat(document.getElementById('nla_kg').value) : 0
+        }; 
+        if(!led.name) return; 
+        if (editingLedId) { let idx = db.leds.findIndex(l => l.id === editingLedId); if (idx > -1) db.leds[idx] = led; walls.forEach(w => { if(w.led.id === led.id) w.led = led; }); } else { db.leds.push(led); }
+        refreshDropdowns(); cancelLedEdit(); saveAppCloudState(); renderCanvas();
     };
     
-    let walls = [];
-    let showCables = false;
-
-    // --- INITIALISATIE ---
-    function init() {
-      updateCanvasSize();
-      refreshDropdowns();
-      applyZoom(0.5);
-    }
-
-    // --- UI FUNCTIES ---
-    function toggleLibForms() {
-      const type = document.getElementById('libTypeSwitcher').value;
-      document.getElementById('form-led').style.display = type === 'led' ? 'block' : 'none';
-      document.getElementById('form-proc').style.display = type === 'proc' ? 'block' : 'none';
-    }
-
-    window.updateCanvasSize = function() {
-      const w = document.getElementById('canW').value;
-      const h = document.getElementById('canH').value;
-      const c = document.getElementById('canvas-container');
-      c.style.width = w + 'px';
-      c.style.height = h + 'px';
+    window.saveNewProcessor = function() { 
+        const isFib = document.getElementById('np_type').value === 'fiber';
+        const proc = { 
+            id: editingProcId ? editingProcId : 'proc_' + Date.now(), name: document.getElementById('np_name').value, px: parseInt(document.getElementById('np_px').value), 
+            isFiber: isFib, ports: isFib ? (parseInt(document.getElementById('np_fibers').value) * parseInt(document.getElementById('np_ports_per_fiber').value)) : parseInt(document.getElementById('np_ports').value), fibers: isFib ? parseInt(document.getElementById('np_fibers').value) : 1, portsPerFiber: isFib ? parseInt(document.getElementById('np_ports_per_fiber').value) : parseInt(document.getElementById('np_ports').value) 
+        }; 
+        if(!proc.name) return; 
+        if (editingProcId) { let idx = db.procs.findIndex(p => p.id === editingProcId); if (idx > -1) db.procs[idx] = proc; } else { db.procs.push(proc); }
+        refreshDropdowns(); cancelProcEdit(); saveAppCloudState(); renderCanvas();
     };
 
-    window.applyZoom = function(val) {
-      document.getElementById('canvas-wrapper').style.transform = `scale(${val})`;
-    };
+    window.deleteLed = function(id) { if(confirm("Definitief verwijderen?")) { db.leds = db.leds.filter(l => l.id !== id); refreshDropdowns(); saveAppCloudState(); } };
+    window.deleteProc = function(id) { if(confirm("Definitief verwijderen?")) { db.procs = db.procs.filter(p => p.id !== id); refreshDropdowns(); saveAppCloudState(); renderCanvas(); } };
 
-    window.toggleCables = function() {
-      showCables = !showCables;
-      document.getElementById('cable-layer').style.display = showCables ? 'block' : 'none';
-      renderCanvas(); 
-    };
-
-    function refreshDropdowns() {
-      const ledSelect = document.getElementById('wall_led');
-      ledSelect.innerHTML = '';
-      db.leds.forEach(l => ledSelect.innerHTML += `<option value="${l.id}">${l.name} (${l.w}x${l.h})</option>`);
-
-      const procSelect = document.getElementById('active_proc');
-      procSelect.innerHTML = '';
-      db.procs.forEach(p => procSelect.innerHTML += `<option value="${p.id}">${p.name}</option>`);
-    }
-
-    // --- OPSLAAN IN BIBLIOTHEEK ---
-    window.saveNewLed = function() {
-      const led = {
-        id: 'led_' + Date.now(),
-        name: document.getElementById('nl_name').value,
-        w: parseInt(document.getElementById('nl_w').value),
-        h: parseInt(document.getElementById('nl_h').value),
-        watt: parseInt(document.getElementById('nl_watt').value),
-        kg: parseFloat(document.getElementById('nl_kg').value)
-      };
-      if(!led.name) return alert("Vul een naam in");
-      db.leds.push(led);
-      localStorage.setItem('pixelmap_leds', JSON.stringify(db.leds));
-      refreshDropdowns();
-      alert("Paneel succesvol toegevoegd aan bibliotheek!");
-      document.getElementById('nl_name').value = ''; // Reset veld
-    };
-
-    window.saveNewProcessor = function() {
-      const proc = {
-        id: 'proc_' + Date.now(),
-        name: document.getElementById('np_name').value,
-        px: parseInt(document.getElementById('np_px').value),
-        ports: parseInt(document.getElementById('np_ports').value)
-      };
-      if(!proc.name) return alert("Vul een naam in");
-      db.procs.push(proc);
-      localStorage.setItem('pixelmap_procs', JSON.stringify(db.procs));
-      refreshDropdowns();
-      alert("Processor succesvol toegevoegd aan bibliotheek!");
-      document.getElementById('np_name').value = ''; // Reset veld
-    };
-
-    // --- SCHERMEN LOGICA ---
     window.addWall = function() {
-      const ledId = document.getElementById('wall_led').value;
-      const led = db.leds.find(l => l.id === ledId);
-      
-      const nameInput = document.getElementById('wall_name').value.trim();
-      const finalName = nameInput !== "" ? nameInput : 'Scherm ' + (walls.length + 1);
-      
-      walls.push({
-        id: finalName,
-        led: led,
-        cols: parseInt(document.getElementById('wall_cols').value),
-        rows: parseInt(document.getElementById('wall_rows').value),
-        x: parseInt(document.getElementById('wall_x').value),
-        y: parseInt(document.getElementById('wall_y').value)
-      });
-      
-      document.getElementById('wall_name').value = ''; // Maak veld weer leeg
+      const led = db.leds.find(l => l.id === document.getElementById('wall_led').value); if(!led) return alert("Selecteer eerst een LED paneel!");
+      let wName = document.getElementById('wall_name').value.trim(); let cols = parseInt(document.getElementById('wall_cols').value); let rows = parseInt(document.getElementById('wall_rows').value); let xPos = parseInt(document.getElementById('wall_x').value); let yPos = parseInt(document.getElementById('wall_y').value);
+
+      if (editingWallIndex !== null) {
+          let wall = walls[editingWallIndex]; let dimChanged = (wall.led.id !== led.id || wall.cols !== cols || wall.rows !== rows);
+          wall.id = wName !== "" ? wName : 'Scherm ' + (editingWallIndex + 1); wall.led = led; wall.cols = cols; wall.rows = rows; wall.x = xPos; wall.y = yPos;
+          if (dimChanged) { wall.customData = []; wall.customPower = []; wall.splitTiles = []; wall.stack = {ladders_1m:[], ladders_05m:[], bases:[], fliepels:[]}; wall.activeHangPoints = Array.from({length: cols}, (_, i) => i); alert("Let op: Omdat de afmetingen of het LED-type zijn gewijzigd, is de patch-data en het frame voor dit scherm gereset."); }
+          cancelWallEdit();
+      } else {
+          walls.push({ 
+              id: wName !== "" ? wName : 'Scherm ' + (walls.length + 1), 
+              led: led, dataMode: 'H', powerMode: 'AUTO', mount: 'hang', 
+              stack: {ladders_1m:[], ladders_05m:[], bases:[], fliepels:[]}, activeHangPoints: Array.from({length: cols}, (_, i) => i),
+              customData: [], customPower: [], splitTiles: [], cols: cols, rows: rows, x: xPos, y: yPos 
+          });
+          document.getElementById('wall_name').value = ''; 
+      }
+      saveAppCloudState();
       renderCanvas();
-      calculateSchema();
     };
 
-    window.removeWall = function(index) {
-      walls.splice(index, 1);
-      renderCanvas();
-      calculateSchema();
+    window.removeWall = function(index) { if(activePatchWall === index) activePatchWall = null; walls.splice(index, 1); saveAppCloudState(); renderCanvas(); };
+    window.renameWall = function(index) { const newName = prompt("Nieuwe naam:", walls[index].id); if (newName && newName.trim() !== "") { walls[index].id = newName.trim(); saveAppCloudState(); renderCanvas(); } };
+    
+    window.setDataMode = function(wIndex, mode) { walls[wIndex].dataMode = mode; if (mode === 'M') { activePatchWall = wIndex; activePatchType = 'data'; document.getElementById('cableViewMode').value = 'both'; } else { if(activePatchWall === wIndex) { activePatchWall = null; activePatchType = null; } saveAppCloudState(); } renderCanvas(); };
+    window.setPowerMode = function(wIndex, mode) { walls[wIndex].powerMode = mode; if (mode === 'M') { activePatchWall = wIndex; activePatchType = 'power'; document.getElementById('cableViewMode').value = 'both'; } else { if(activePatchWall === wIndex) { activePatchWall = null; activePatchType = null; } saveAppCloudState(); } renderCanvas(); };
+    window.setLayoutMode = function(wIndex) { activePatchWall = wIndex; activePatchType = 'layout'; document.getElementById('cableViewMode').value = 'both'; renderCanvas(); };
+    window.setMountMode = function(wIndex, mode) { walls[wIndex].mount = mode; saveAppCloudState(); renderCanvas(); };
+    window.setStackMode = function(wIndex) { activePatchWall = wIndex; activePatchType = 'stackframe'; activeStackTool = 'base'; document.getElementById('cableViewMode').value = 'hardware'; renderCanvas(); };
+    window.setRiggingMode = function(wIndex) { activePatchWall = wIndex; activePatchType = 'rigging'; document.getElementById('cableViewMode').value = 'hardware'; renderCanvas(); };
+    window.stopManualPatch = function() { activePatchWall = null; activePatchType = null; document.getElementById('cableViewMode').value = 'both'; saveAppCloudState(); renderCanvas(); };
+    
+    window.handleBannerProcChange = function() { renderCanvas(); };
+    window.handleBannerPortChange = function() { renderCanvas(); };
+    
+    window.forceNewCable = function() {
+        if (activePatchType === 'data') { let sel = document.getElementById('draw-port-sel'); if (sel && sel.selectedIndex < sel.options.length - 1) { sel.selectedIndex++; renderCanvas(); } } 
+        else if (activePatchType === 'power') { let sel = document.getElementById('draw-group-sel'); if (sel) { sel.value = parseInt(sel.value) + 1; renderCanvas(); } }
     };
 
-    // --- NAAM AANPASSEN ---
-    window.renameWall = function(index) {
-      const currentName = walls[index].id;
-      const newName = prompt("Voer een nieuwe naam in voor dit scherm:", currentName);
-      
-      if (newName !== null && newName.trim() !== "") {
-        walls[index].id = newName.trim();
-        renderCanvas();
-        calculateSchema();
+    window.undoPatch = function() {
+      if (activePatchWall === null || activePatchType === null) return;
+      const wall = walls[activePatchWall];
+      if (activePatchType === 'data') {
+         let pIdx = parseInt(document.getElementById('draw-proc-sel').value); let port = parseInt(document.getElementById('draw-port-sel').value);
+         let pathObj = wall.customData.find(p => p.procIdx === pIdx && p.port === port); if (pathObj && pathObj.tiles.length > 0) { pathObj.tiles.pop(); renderCanvas(); }
+      } else if (activePatchType === 'power') {
+         let grp = parseInt(document.getElementById('draw-group-sel').value);
+         let pathObj = wall.customPower.find(p => p.group === grp); if (pathObj && pathObj.tiles.length > 0) { pathObj.tiles.pop(); renderCanvas(); }
       }
     };
 
-    // --- RENDERING & KABELS ---
-    function renderCanvas() {
-      const container = document.getElementById('canvas-container');
-      const cableLayer = document.getElementById('cable-layer');
-      
-      // Verwijder oude HTML muren, behoud de SVG layer
-      Array.from(container.children).forEach(c => {
-        if(c.id !== 'cable-layer') c.remove();
-      });
-      cableLayer.innerHTML = ''; // Maak SVG lijnen leeg
-
-      walls.forEach(wall => {
-        // Bouw de HTML container
-        const wDiv = document.createElement('div');
-        wDiv.className = 'led-wall';
-        wDiv.style.left = wall.x + 'px';
-        wDiv.style.top = wall.y + 'px';
-        wDiv.style.gridTemplateColumns = `repeat(${wall.cols}, ${wall.led.w}px)`;
-        wDiv.style.gridTemplateRows = `repeat(${wall.rows}, ${wall.led.h}px)`;
-        
-        let panelCenters = [];
-        const total = wall.cols * wall.rows;
-        
-        for (let i = 0; i < total; i++) {
-          const p = document.createElement('div');
-          p.className = 'led-panel';
-          
-          // Toon schermnaam en paneelnummer erin
-          p.innerHTML = `<span style="font-weight:bold; color:#fff;">${wall.id}</span><br>P${i + 1}`; 
-          wDiv.appendChild(p);
-
-          // Bereken centrum voor SVG datakabel (Zig-zag patroon)
-          if(showCables) {
-             const col = i % wall.cols;
-             const row = Math.floor(i / wall.cols);
-             const actualCol = (row % 2 === 0) ? col : (wall.cols - 1 - col); 
-             
-             const cx = wall.x + (actualCol * wall.led.w) + (wall.led.w / 2);
-             const cy = wall.y + ((wall.rows - 1 - row) * wall.led.h) + (wall.led.h / 2); 
-             panelCenters.push(`${cx},${cy}`);
-          }
+    // Engine: W, H, X, Y in Pixels op Canvas. Physics berekent via physW/physH
+    function getWallPanels(wall) {
+        let panels = [];
+        for(let r=0; r<wall.rows; r++) {
+            for(let c=0; c<wall.cols; c++) {
+                let isAlt = wall.splitTiles && wall.splitTiles.find(s => s.r === r && s.c === c);
+                let tileX = 0; for(let i=0; i<c; i++) { let prevIsAlt = wall.splitTiles && wall.splitTiles.find(s => s.r === r && s.c === i); tileX += prevIsAlt ? wall.led.altPxW : wall.led.pxW; }
+                let tileY = 0; for(let i=0; i<r; i++) { let prevIsAlt = wall.splitTiles && wall.splitTiles.find(s => s.r === i && s.c === c); tileY += prevIsAlt ? wall.led.altPxH : wall.led.pxH; }
+                
+                if(isAlt) { panels.push({ id: `${r}-${c}`, baseR: r, baseC: c, x: tileX, y: tileY, w: wall.led.altPxW, h: wall.led.altPxH, physW: wall.led.altPhysW, physH: wall.led.altPhysH, type: 'alt', watt: wall.led.altWatt, px: wall.led.altPxW * wall.led.altPxH, pxW: wall.led.altPxW, pxH: wall.led.altPxH, kg: wall.led.altKg }); } 
+                else { panels.push({ id: `${r}-${c}`, baseR: r, baseC: c, x: tileX, y: tileY, w: wall.led.pxW, h: wall.led.pxH, physW: wall.led.physW, physH: wall.led.physH, type: 'normal', watt: wall.led.watt, px: wall.led.pxW * wall.led.pxH, pxW: wall.led.pxW, pxH: wall.led.pxH, kg: wall.led.kg }); }
+            }
         }
-        
-        container.appendChild(wDiv);
-
-        // Teken SVG Kabel voor deze muur als ze aan staan
-        if(showCables && panelCenters.length > 0) {
-          const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
-          polyline.setAttribute('points', panelCenters.join(' '));
-          polyline.setAttribute('class', 'data-cable');
-          cableLayer.appendChild(polyline);
-        }
-      });
+        return panels;
     }
 
-    // --- CALCULATIES ---
-    window.calculateSchema = function() {
-      let gPx = 0, gKg = 0, gW = 0;
+    window.handleTileClick = function(wIndex, panelId) {
+      if (activePatchWall !== wIndex) return;
+      const wall = walls[wIndex]; const panels = getWallPanels(wall); const clickedPanel = panels.find(p => p.id === panelId);
+      if (!clickedPanel) return;
+
+      if (activePatchType === 'layout') {
+          if (!wall.led.hasAlt) return;
+          let isAlt = wall.splitTiles && wall.splitTiles.some(s => s.r === clickedPanel.baseR && s.c === clickedPanel.baseC);
+          if (isAlt) { wall.splitTiles = wall.splitTiles.filter(s => !(s.r === clickedPanel.baseR && s.c === clickedPanel.baseC)); } 
+          else { if(!wall.splitTiles) wall.splitTiles = []; wall.splitTiles.push({r: clickedPanel.baseR, c: clickedPanel.baseC}); }
+          
+          wall.stack = { ladders_1m: [], ladders_05m: [], bases: [], fliepels: [] };
+          wall.customData.forEach(p => p.tiles = p.tiles.filter(t => t !== panelId));
+          wall.customPower.forEach(p => p.tiles = p.tiles.filter(t => t !== panelId));
+          renderCanvas(); return;
+      }
       
-      const procId = document.getElementById('active_proc').value;
-      const proc = db.procs.find(p => p.id === procId) || db.procs[0];
-      const maxPower = parseInt(document.getElementById('active_power').value);
+      if (activePatchType === 'stackframe') {
+          let isBottom = !panels.some(other => other.baseC === clickedPanel.baseC && other.y > clickedPanel.y);
+          
+          let propName;
+          if (activeStackTool === 'ladder_1m') propName = 'ladders_1m';
+          else if (activeStackTool === 'ladder_05m') propName = 'ladders_05m';
+          else propName = activeStackTool + 's';
 
-      const listDiv = document.getElementById('wall-list-container');
-      listDiv.innerHTML = '';
+          let arr = wall.stack[propName] || [];
+          let exists = arr.includes(panelId);
+          let doAdd = false;
 
-      walls.forEach((w, i) => {
-        const panels = w.cols * w.rows;
-        const px = panels * (w.led.w * w.led.h);
-        const kg = panels * w.led.kg;
-        const watt = panels * w.led.watt;
+          if (isPatchDragging && window.patchDrawAction) {
+              if (window.patchDrawAction === 'add' && !exists) doAdd = true;
+              else if (window.patchDrawAction === 'remove' && exists) doAdd = false;
+              else return; 
+          } else { doAdd = !exists; }
 
-        gPx += px; gKg += kg; gW += watt;
+          if (activeStackTool === 'base') {
+              if (!isBottom) return; 
+              if (doAdd) { 
+                  wall.stack.bases.push(panelId); 
+              } else { 
+                  wall.stack.bases = wall.stack.bases.filter(id => id !== panelId); 
+                  let colPanels = panels.filter(p => p.baseC === clickedPanel.baseC).map(p=>p.id);
+                  wall.stack.ladders_1m = wall.stack.ladders_1m.filter(id => !colPanels.includes(id));
+                  wall.stack.ladders_05m = wall.stack.ladders_05m.filter(id => !colPanels.includes(id));
+                  wall.stack.fliepels = wall.stack.fliepels.filter(id => !colPanels.includes(id));
+              }
+          } 
+          else if (activeStackTool === 'ladder_1m' || activeStackTool === 'ladder_05m') {
+              let baseExists = wall.stack.bases.some(bId => {
+                  let bp = panels.find(p=>p.id === bId); return bp && bp.baseC === clickedPanel.baseC;
+              });
+              if (!baseExists) {
+                  const banner = document.getElementById('patch-instruction'); let oldBg = banner.style.backgroundColor; banner.style.backgroundColor = 'var(--danger)'; setTimeout(() => banner.style.backgroundColor = oldBg, 300); return;
+              }
+              if (doAdd) { 
+                  wall.stack.ladders_1m = wall.stack.ladders_1m.filter(id => id !== panelId);
+                  wall.stack.ladders_05m = wall.stack.ladders_05m.filter(id => id !== panelId);
+                  wall.stack[propName].push(panelId); 
+              } 
+              else { 
+                  wall.stack[propName] = wall.stack[propName].filter(id => id !== panelId); 
+                  
+                  wall.stack.fliepels = wall.stack.fliepels.filter(fId => {
+                      let fPanel = panels.find(p => p.id === fId);
+                      if(!fPanel) return false;
+                      let overlaps = false;
+                      panels.forEach(L => {
+                          if (wall.stack.ladders_1m.includes(L.id)) {
+                              let pxPerMmY = L.h / L.physH; let lPxH = 1000 * pxPerMmY;
+                              let lTop = L.y + L.h - lPxH; let lBottom = L.y + L.h;
+                              if (fPanel.baseC === L.baseC && (fPanel.y + fPanel.h/2) >= lTop && (fPanel.y + fPanel.h/2) <= lBottom) overlaps = true;
+                          }
+                          if (wall.stack.ladders_05m.includes(L.id)) {
+                              let pxPerMmY = L.h / L.physH; let lPxH = 500 * pxPerMmY;
+                              let lTop = L.y + L.h - lPxH; let lBottom = L.y + L.h;
+                              if (fPanel.baseC === L.baseC && (fPanel.y + fPanel.h/2) >= lTop && (fPanel.y + fPanel.h/2) <= lBottom) overlaps = true;
+                          }
+                      });
+                      return overlaps;
+                  });
+              }
+          }
+          else if (activeStackTool === 'fliepel') {
+              let ladderOverlaps = false;
+              panels.forEach(L => {
+                  if (wall.stack.ladders_1m.includes(L.id)) {
+                      let pxPerMmY = L.h / L.physH; let lPxH = 1000 * pxPerMmY;
+                      let lTop = L.y + L.h - lPxH; let lBottom = L.y + L.h;
+                      if (clickedPanel.baseC === L.baseC && (clickedPanel.y + clickedPanel.h/2) >= lTop && (clickedPanel.y + clickedPanel.h/2) <= lBottom) ladderOverlaps = true;
+                  }
+                  if (wall.stack.ladders_05m.includes(L.id)) {
+                      let pxPerMmY = L.h / L.physH; let lPxH = 500 * pxPerMmY;
+                      let lTop = L.y + L.h - lPxH; let lBottom = L.y + L.h;
+                      if (clickedPanel.baseC === L.baseC && (clickedPanel.y + clickedPanel.h/2) >= lTop && (clickedPanel.y + clickedPanel.h/2) <= lBottom) ladderOverlaps = true;
+                  }
+              });
+              if (!ladderOverlaps) {
+                  const banner = document.getElementById('patch-instruction'); let oldBg = banner.style.backgroundColor; banner.style.backgroundColor = 'var(--danger)'; setTimeout(() => banner.style.backgroundColor = oldBg, 300); return;
+              }
+              if (doAdd) { wall.stack.fliepels.push(panelId); } 
+              else { wall.stack.fliepels = wall.stack.fliepels.filter(id => id !== panelId); }
+          }
+          
+          if(!isPatchDragging) window.patchDrawAction = doAdd ? 'add' : 'remove';
+          renderCanvas(); return;
+      }
 
-        const portsNeeded = Math.ceil(px / proc.px);
-        const powerNeeded = Math.ceil(watt / maxPower);
-
-        listDiv.innerHTML += `
-          <div class="card">
-            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
-              <span style="font-weight:bold; font-size:14px; color:var(--accent); cursor:pointer;" onclick="renameWall(${i})" title="Klik om naam aan te passen">✏️ ${w.id}</span> 
-              <button class="danger" onclick="removeWall(${i})" style="width:auto; padding:3px 8px; font-size:11px;">X</button>
-            </div>
-            <div class="card-stat"><span>Type:</span> <span style="color:white;">${w.led.name} (${panels} stuks)</span></div>
-            <div class="card-stat"><span>Resolutie:</span> <span>${w.cols * w.led.w} x ${w.rows * w.led.h} px</span></div>
-            <div class="card-stat"><span>Gewicht:</span> <span>${kg.toFixed(1)} kg</span></div>
-            <div class="card-stat"><span>Poorten:</span> <span style="color:var(--success);">${portsNeeded}x Data</span></div>
-            <div class="card-stat"><span>Stroom:</span> <span style="color:var(--danger);">${powerNeeded}x Groep</span></div>
-          </div>
-        `;
-      });
-
-      // Update UI totalen
-      document.getElementById('tot_px').innerText = gPx.toLocaleString();
-      document.getElementById('tot_kg').innerText = gKg.toFixed(1) + ' kg';
-      document.getElementById('tot_w').innerText = gW.toLocaleString() + ' W';
-      
-      const totalPorts = Math.ceil(gPx / proc.px);
-      const totalPower = Math.ceil(gW / maxPower);
-      
-      const pSpan = document.getElementById('req_ports');
-      pSpan.innerText = `${totalPorts} / ${proc.ports} poorten`;
-      pSpan.style.color = totalPorts > proc.ports ? 'var(--danger)' : 'white';
-
-      document.getElementById('req_power').innerText = `${totalPower} groepen`;
+      if (activePatchType === 'data') {
+          let pIdx = parseInt(document.getElementById('draw-proc-sel').value); let port = parseInt(document.getElementById('draw-port-sel').value);
+          let pathObj = wall.customData.find(p => p.procIdx === pIdx && p.port === port); if (!pathObj) { pathObj = { procIdx: pIdx, port: port, tiles: [] }; wall.customData.push(pathObj); }
+          if (pathObj.tiles.length > 0) { 
+              let lastId = pathObj.tiles[pathObj.tiles.length - 1]; 
+              if (lastId === panelId) { pathObj.tiles.pop(); renderCanvas(); return; } 
+              let lastPanel = panels.find(p => p.id === lastId);
+              if (lastPanel && lastPanel.type !== clickedPanel.type) {
+                  const banner = document.getElementById('patch-instruction'); let oldBg = banner.style.backgroundColor; banner.style.backgroundColor = 'var(--danger)'; setTimeout(() => banner.style.backgroundColor = oldBg, 300); return; 
+              }
+          }
+          wall.customData.forEach(p => { p.tiles = p.tiles.filter(t => t !== panelId); }); pathObj.tiles.push(panelId);
+      } else if (activePatchType === 'power') {
+          let grp = parseInt(document.getElementById('draw-group-sel').value);
+          let pathObj = wall.customPower.find(p => p.group === grp); if (!pathObj) { pathObj = { group: grp, tiles: [] }; wall.customPower.push(pathObj); }
+          if (pathObj.tiles.length > 0) { let lastId = pathObj.tiles[pathObj.tiles.length - 1]; if (lastId === panelId) { pathObj.tiles.pop(); renderCanvas(); return; } }
+          wall.customPower.forEach(p => { p.tiles = p.tiles.filter(t => t !== panelId); }); pathObj.tiles.push(panelId);
+      }
+      renderCanvas();
     };
 
-    // Start
-    init();
+    function createSVGMarker(x, y, text, color, shapeType = 'circle', markerClass = 'data-marker', wIndex = null, isDimmed = false) {
+      const g = document.createElementNS('http://www.w3.org/2000/svg', 'g'); g.setAttribute('class', markerClass);
+      if (wIndex !== null) g.setAttribute('data-wall', wIndex);
+      const shape = document.createElementNS('http://www.w3.org/2000/svg', shapeType === 'rect' ? 'rect' : 'circle');
+      if(shapeType === 'rect') { shape.setAttribute('x', x - 12); shape.setAttribute('y', y - 12); shape.setAttribute('width', 24); shape.setAttribute('height', 24); } 
+      else { shape.setAttribute('cx', x); shape.setAttribute('cy', y); shape.setAttribute('r', 12); }
+      shape.setAttribute('fill', color);
+      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      label.setAttribute('x', x); label.setAttribute('y', y + 4); label.setAttribute('text-anchor', 'middle'); 
+      label.setAttribute('fill', isDimmed ? '#666' : '#fff'); label.setAttribute('font-size', '10px'); label.setAttribute('font-weight', 'bold'); label.textContent = text;
+      g.appendChild(shape); g.appendChild(label); return g;
+    }
+
+    function getColors(procIdx, hue) {
+        if (procIdx === 1) return { bg: `hsl(${hue}, 40%, 25%)`, border: `hsl(${hue}, 60%, 75%)`, text: `#fff` };
+        else if (procIdx === 2) return { bg: `hsl(${hue}, 30%, 20%)`, border: `hsl(${hue}, 50%, 60%)`, text: `#fff` };
+        else return { bg: `hsl(${hue}, 40%, 8%)`, border: `hsl(${hue}, 90%, 50%)`, text: `#fff` };
+    }
+
+    function renderCanvas() {
+      const wallLayer = document.getElementById('wall-layer'); const cableLayer = document.getElementById('cable-layer'); const textLayer = document.getElementById('text-layer');
+      const cWidth = parseInt(document.getElementById('canW').value); const cHeight = parseInt(document.getElementById('canH').value);
+      const cableMode = document.getElementById('cableViewMode').value;
+      
+      let procsHtml = '';
+      projectProcs.forEach((pp, i) => {
+          let conf = db.procs.find(x => x.id === pp.dbId); let pName = conf ? conf.name : 'Unknown';
+          procsHtml += `<div class="lib-item"><span style="color:${i===1?'#ffb3ba':(i===2?'#b3e0ff':'white')}">Proc ${i+1}: ${pName}</span> <button onclick="removeProjectProc(${i})">X</button></div>`;
+      });
+      document.getElementById('project-procs-list').innerHTML = procsHtml;
+
+      wallLayer.innerHTML = ''; cableLayer.innerHTML = ''; textLayer.innerHTML = '';
+
+      let usedPorts = {}; let globalAutoProc = 0; let globalAutoPort = 1; let globalAutoPowerGroup = 1;
+      walls.forEach(w => { if (w.dataMode === 'M') { w.customData.forEach(p => { if(!usedPorts[p.procIdx]) usedPorts[p.procIdx] = {}; usedPorts[p.procIdx][p.port] = w.id; }); } });
+
+      function getNextFreePort() {
+          while (globalAutoProc < projectProcs.length) {
+              let conf = db.procs.find(x => x.id === projectProcs[globalAutoProc].dbId); let maxP = conf ? conf.px : 650000;
+              while (globalAutoPort <= (conf ? conf.ports : 20)) { if (!usedPorts[globalAutoProc] || !usedPorts[globalAutoProc][globalAutoPort]) return { procIdx: globalAutoProc, port: globalAutoPort }; globalAutoPort++; }
+              globalAutoProc++; globalAutoPort = 1;
+          }
+          return { procIdx: 0, port: 999 }; 
+      }
+
+      let calcData = { px:0, kg:0, watt:0, oob:0, l1W:0, l1G:0, l2W:0, l2G:0, l3W:0, l3G:0, html:'' };
+
+      bomTotals = { px:0, kg:0, watt:0, l1m:0, l05m:0, bases:0, feet:0, fliepels:0, bars1:0, bars2:0, activeShackles:0, ethercon:0, powercon:0, ledTypes:{}, procTypes:{} };
+      projectProcs.forEach(pp => { let pConf = db.procs.find(x => x.id === pp.dbId); if(pConf) { bomTotals.procTypes[pConf.name] = (bomTotals.procTypes[pConf.name] || 0) + 1; } });
+
+      let showHwViewGlobally = (activePatchType === 'stackframe' || activePatchType === 'rigging' || cableMode === 'hardware');
+      let dimDataCables = (activePatchWall !== null && activePatchType === 'power') || showHwViewGlobally;
+      let dimPowerCables = (activePatchWall !== null && activePatchType === 'data') || showHwViewGlobally;
+      
+      const container = document.getElementById('canvas-container');
+      if (showHwViewGlobally) container.classList.add('show-hw-ui'); else container.classList.remove('show-hw-ui');
+
+      walls.forEach((wall, wIndex) => {
+        const isDrawing = (activePatchWall === wIndex);
+        const panelsArray = getWallPanels(wall);
+        
+        let wallW = 0; let wallH = 0;
+        panelsArray.forEach(p => { if (p.x + p.w > wallW) wallW = p.x + p.w; if (p.y + p.h > wallH) wallH = p.y + p.h; });
+
+        const wDiv = document.createElement('div'); wDiv.className = 'led-wall'; wDiv.setAttribute('data-wall', wIndex);
+        if (isDrawing && activePatchType === 'data') wDiv.classList.add('patching-active');
+        else if (isDrawing && activePatchType === 'power') wDiv.classList.add('patching-active');
+        else if (isDrawing && activePatchType === 'layout') wDiv.classList.add('layout-active');
+        else if (isDrawing && (activePatchType === 'stackframe' || activePatchType === 'rigging')) wDiv.classList.add('hw-active');
+        
+        wDiv.style.left = wall.x + 'px'; wDiv.style.top = wall.y + 'px'; wDiv.style.width = wallW + 'px'; wDiv.style.height = wallH + 'px';
+        
+        const giantTitle = document.createElement('div'); giantTitle.className = 'wall-title-giant';
+        giantTitle.innerText = wall.id; giantTitle.style.fontSize = Math.min(wallW * 0.15, 120) + 'px';
+        wDiv.appendChild(giantTitle);
+
+        let overlapL = Math.max(0, wall.x); let overlapR = Math.min(cWidth, wall.x + wallW);
+        let overlapT = Math.max(0, wall.y); let overlapB = Math.min(cHeight, wall.y + wallH);
+        if (overlapR <= overlapL || overlapB <= overlapT) { overlapL = 0; overlapR = 0; overlapT = 0; overlapB = 0; }
+        calcData.oob += (wallW * wallH) - ((overlapR - overlapL) * (overlapB - overlapT));
+
+        if (wall.x < 0) wDiv.innerHTML += `<div class="oob-tint" style="left:0; top:0; width:${-wall.x}px; height:${wallH}px;"></div>`;
+        if (wall.y < 0) wDiv.innerHTML += `<div class="oob-tint" style="left:0; top:0; width:${wallW}px; height:${-wall.y}px;"></div>`;
+        if (wall.x + wallW > cWidth) wDiv.innerHTML += `<div class="oob-tint" style="right:0; top:0; width:${(wall.x + wallW)-cWidth}px; height:${wallH}px;"></div>`;
+        if (wall.y + wallH > cHeight) wDiv.innerHTML += `<div class="oob-tint" style="left:0; bottom:0; width:${wallW}px; height:${(wall.y + wallH)-cHeight}px;"></div>`;
+
+        let wallPixels = 0; let wallKg = 0; let wallWatt = 0;
+        panelsArray.forEach(p => { 
+            wallPixels += p.px; wallKg += p.kg; wallWatt += p.watt; 
+            let pName = p.type === 'alt' ? `${wall.led.name} (Alt ${p.pxW}x${p.pxH}px)` : `${wall.led.name} (${p.pxW}x${p.pxH}px)`;
+            bomTotals.ledTypes[pName] = (bomTotals.ledTypes[pName] || 0) + 1;
+        });
+
+        let cableKg = panelsArray.length * 0.25;
+        wallKg += cableKg;
+        
+        let barWeightsTotal = 0;
+        let colXCoords = []; 
+        
+        if (wall.mount === 'hang') {
+            let currentX = 0;
+            for(let c=0; c<wall.cols; c++) {
+                let topPanel = panelsArray.find(p => p.baseR === 0 && p.baseC === c);
+                let pWidth = topPanel ? topPanel.w : wall.led.pxW;
+                colXCoords.push({ c: c, x: currentX, w: pWidth, cx: currentX + (pWidth/2) });
+                currentX += pWidth;
+            }
+
+            let colIdx = 0; let currentBars1 = 0; let currentBars2 = 0;
+            while(colIdx < wall.cols) {
+                let isTwo = (wall.cols - colIdx) >= 2;
+                let startCol = colXCoords[colIdx]; let endCol = isTwo ? colXCoords[colIdx + 1] : startCol;
+                let barX = startCol.x; let barW = (endCol.x + endCol.w) - startCol.x;
+                
+                let bDiv = document.createElement('div'); bDiv.className = 'rig-bar'; bDiv.style.left = barX + 'px'; bDiv.style.width = barW + 'px'; wDiv.appendChild(bDiv);
+                
+                if(isTwo) { currentBars2++; colIdx += 2; wallKg += 28; barWeightsTotal += 28; } 
+                else { currentBars1++; colIdx += 1; wallKg += 14; barWeightsTotal += 14; }
+            }
+            bomTotals.bars1 += currentBars1; bomTotals.bars2 += currentBars2;
+        }
+
+        calcData.px += wallPixels; calcData.kg += wallKg; calcData.watt += wallWatt;
+
+        let bottomTiles = panelsArray.filter(p => !panelsArray.some(other => other.baseC === p.baseC && other.y > p.y));
+
+        if (wall.mount === 'stack') {
+            let uniqueCols = [...new Set(panelsArray.map(p => p.baseC))];
+            uniqueCols.forEach(c => {
+                let hasBase = wall.stack.bases.some(bId => panelsArray.find(p=>p.id === bId).baseC === c);
+                if (hasBase) {
+                    let colLadders = panelsArray.filter(p => p.baseC === c && (wall.stack.ladders_1m.includes(p.id) || wall.stack.ladders_05m.includes(p.id)));
+                    let colHeight = 0; 
+                    colLadders.forEach(l => {
+                        let is1m = wall.stack.ladders_1m.includes(l.id);
+                        colHeight += is1m ? 1000 : 500;
+                    });
+                    bomTotals.l1m += Math.floor(colHeight / 1000);
+                    bomTotals.l05m += Math.ceil((colHeight % 1000) / 500);
+                }
+            });
+            bomTotals.bases += wall.stack.bases.length; 
+            bomTotals.feet += bottomTiles.length;
+            bomTotals.fliepels += wall.stack.fliepels.length;
+        }
+
+        let pointLoads = {};
+        let maxLoad = 0;
+
+        if (wall.mount === 'hang') {
+            let activeCount = wall.activeHangPoints.length;
+            let activePoints = [...wall.activeHangPoints].sort((a,b)=>a-b);
+            
+            if (activeCount > 0) {
+                let wallW = colXCoords.length > 0 ? colXCoords[colXCoords.length - 1].x + colXCoords[colXCoords.length - 1].w : 0;
+                let q = wallKg / wallW; 
+                for(let i=0; i<activeCount; i++) {
+                    let c = activePoints[i];
+                    let ptX = colXCoords[c].cx;
+                    let leftBound = (i === 0) ? 0 : (ptX + colXCoords[activePoints[i-1]].cx) / 2;
+                    let rightBound = (i === activeCount - 1) ? wallW : (ptX + colXCoords[activePoints[i+1]].cx) / 2;
+                    let load = q * (rightBound - leftBound);
+                    pointLoads[c] = load;
+                    if(load > maxLoad) maxLoad = load;
+                }
+            }
+
+            colXCoords.forEach(col => {
+                let c = col.c; let isActive = wall.activeHangPoints.includes(c);
+                if (isActive) bomTotals.activeShackles++;
+                let shackleX = col.x + (col.w / 2) - 8; 
+
+                let sDiv = document.createElement('div'); sDiv.className = 'rig-shackle'; sDiv.style.left = shackleX + 'px';
+                if(isDrawing && activePatchType === 'rigging') {
+                    sDiv.style.borderColor = isActive ? 'var(--success)' : '#444'; sDiv.style.opacity = isActive ? '1' : '0.4'; sDiv.style.pointerEvents = 'auto'; sDiv.style.cursor = 'pointer';
+                    sDiv.onmousedown = (e) => { e.stopPropagation(); if(isActive) wall.activeHangPoints = wall.activeHangPoints.filter(id => id !== c); else wall.activeHangPoints.push(c); renderCanvas(); };
+                } else { sDiv.style.borderColor = isActive ? '#aaa' : '#333'; sDiv.style.opacity = isActive ? '1' : '0.1'; sDiv.style.pointerEvents = 'none'; }
+                wDiv.appendChild(sDiv);
+
+                if (isActive && pointLoads[c]) {
+                    let load = pointLoads[c].toFixed(1);
+                    let lDiv = document.createElement('div');
+                    lDiv.className = 'rig-weight-label ' + (load > 500 ? 'danger' : 'safe');
+                    lDiv.innerHTML = `${load}<br>kg`;
+                    lDiv.style.left = (col.x + (col.w / 2)) + 'px';
+                    wDiv.appendChild(lDiv);
+                }
+            });
+        }
+
+        let dataPaths = []; 
+        if (wall.dataMode === 'M') { dataPaths = JSON.parse(JSON.stringify(wall.customData)); } 
+        else {
+            let flatPatch = [];
+            if (wall.dataMode === 'H') { 
+                let uniqueRows = [...new Set(panelsArray.map(p => p.baseR))].sort((a,b) => b - a); 
+                uniqueRows.forEach((r, idx) => { let rPanels = panelsArray.filter(p => p.baseR === r); rPanels.sort((a,b) => (idx % 2 === 0) ? (a.baseC - b.baseC) : (b.baseC - a.baseC)); flatPatch.push(...rPanels); });
+            } else { 
+                let uniqueCols = [...new Set(panelsArray.map(p => p.baseC))].sort((a,b) => a - b); 
+                uniqueCols.forEach((c, idx) => { let cPanels = panelsArray.filter(p => p.baseC === c); cPanels.sort((a,b) => (idx % 2 === 0) ? (b.baseR - a.baseR) : (a.baseR - b.baseR)); flatPatch.push(...cPanels); });
+            }
+            
+            let currP = []; let cType = null; let cPx = 0;
+            for(let tile of flatPatch) {
+                let conf = projectProcs[globalAutoProc] ? db.procs.find(x => x.id === projectProcs[globalAutoProc].dbId) : null; let maxPxPort = conf ? conf.px : 650000;
+                if (currP.length > 0 && (cPx + tile.px > maxPxPort || cType !== tile.type)) {
+                    let assignment = getNextFreePort(); if (!usedPorts[assignment.procIdx]) usedPorts[assignment.procIdx] = {}; usedPorts[assignment.procIdx][assignment.port] = wall.id;
+                    dataPaths.push({ procIdx: assignment.procIdx, port: assignment.port, tiles: currP }); currP = []; cPx = 0;
+                }
+                cType = tile.type; currP.push(tile.id); cPx += tile.px;
+            }
+            if (currP.length > 0) {
+                let assignment = getNextFreePort(); if (!usedPorts[assignment.procIdx]) usedPorts[assignment.procIdx] = {}; usedPorts[assignment.procIdx][assignment.port] = wall.id;
+                dataPaths.push({ procIdx: assignment.procIdx, port: assignment.port, tiles: currP });
+            }
+        }
+
+        let powerPaths = []; 
+        if (wall.powerMode === 'M') { powerPaths = JSON.parse(JSON.stringify(wall.customPower)); } 
+        else {
+            let flatPatch = []; let uniqueRows = [...new Set(panelsArray.map(p => p.baseR))].sort((a,b) => b - a); 
+            uniqueRows.forEach((r, idx) => { let rPanels = panelsArray.filter(p => p.baseR === r); rPanels.sort((a,b) => (idx % 2 === 0) ? (a.baseC - b.baseC) : (b.baseC - a.baseC)); flatPatch.push(...rPanels); });
+            let currP = []; let cWatt = 0;
+            for(let tile of flatPatch) {
+                if (currP.length > 0 && cWatt + tile.watt > MAX_POWER_PER_GROUP) { powerPaths.push({ group: globalAutoPowerGroup++, tiles: currP }); currP = []; cWatt = 0; }
+                currP.push(tile.id); cWatt += tile.watt;
+            }
+            if (currP.length > 0) powerPaths.push({ group: globalAutoPowerGroup++, tiles: currP });
+        }
+
+        let dLinks = 0; dataPaths.forEach(p => dLinks += Math.max(0, p.tiles.length - 1));
+        let pLinks = 0; powerPaths.forEach(p => pLinks += Math.max(0, p.tiles.length - 1));
+        bomTotals.ethercon += dLinks; bomTotals.powercon += pLinks;
+
+        let dataMap = {}; let dataLegendItems = [];
+        dataPaths.forEach(path => { 
+            if(path.tiles.length === 0) return;
+            let conf = db.procs.find(x => x.id === projectProcs[path.procIdx]?.dbId); let pName = conf ? conf.name : 'Unknown';
+            let portColor = `hsl(${(path.port * 75) % 360}, 100%, 50%)`;
+            dataLegendItems.push(`<div class="legend-data"><span class="color-box" style="background:${portColor}"></span> Proc ${path.procIdx + 1} (${pName}) - Poort ${formatPortLabel(conf, path.port, false)}</div>`);
+            path.tiles.forEach((tId, idx) => { dataMap[tId] = { procIdx: path.procIdx, port: path.port, tile: idx + 1 }; }); 
+        });
+
+        let powerMap = {}; let powerLegendItems = [];
+        powerPaths.forEach((path) => {
+            if(path.tiles.length === 0) return;
+            const phase = ((path.group - 1) % 3) + 1; let groupWatt = 0; path.tiles.forEach(tId => groupWatt += panelsArray.find(p=>p.id===tId).watt);
+            const phaseColor = phase === 1 ? '#ff3366' : (phase === 2 ? '#33ccff' : '#ffcc00');
+            powerLegendItems.push(`<div class="legend-power"><span class="color-box" style="background:${phaseColor}"></span> Groep ${path.group} (L${phase})</div>`);
+            if(phase === 1) { calcData.l1W += groupWatt; calcData.l1G++; } if(phase === 2) { calcData.l2W += groupWatt; calcData.l2G++; } if(phase === 3) { calcData.l3W += groupWatt; calcData.l3G++; }
+            path.tiles.forEach(tId => { powerMap[tId] = { group: path.group, phase: phase }; });
+        });
+
+        dataLegendItems = [...new Set(dataLegendItems)]; powerLegendItems = [...new Set(powerLegendItems)];
+        const legendDiv = document.createElement('div'); legendDiv.className = 'wall-legend'; legendDiv.setAttribute('data-wall', wIndex);
+        legendDiv.style.left = wall.x + 'px'; legendDiv.style.top = (wall.y + wallH + 20) + 'px';
+        
+        let hwLegendItems = '';
+        if(showHwViewGlobally) {
+            if(wall.mount === 'stack') {
+                hwLegendItems += `<div class="legend-hw"><span class="color-box" style="background:#444;"></span> Ladder</div>`;
+                hwLegendItems += `<div class="legend-hw"><span class="color-box" style="background:#0088ff; border-radius:50%;"></span> Fliepel</div>`;
+                hwLegendItems += `<div class="legend-hw"><span class="color-box" style="background:#222;"></span> Baseplate / Voetje</div>`;
+            } else {
+                hwLegendItems += `<div class="legend-hw"><span class="color-box" style="background:#333;"></span> Hang / Bumper Bar</div>`;
+                hwLegendItems += `<div class="legend-hw"><span class="color-box" style="background:#aaa; border-radius:50%;"></span> Hijsoog (Actief)</div>`;
+            }
+            hwLegendItems = `<hr style="border:0; border-top:1px solid #ccc; margin:5px 0;"><strong>Hardware</strong><br>` + hwLegendItems;
+        }
+
+        legendDiv.innerHTML = `<strong>${wall.id} Legenda</strong><hr style="border:0; border-top:1px solid #ccc; margin:5px 0;">` + dataLegendItems.join('') + powerLegendItems.join('') + hwLegendItems;
+        textLayer.appendChild(legendDiv);
+
+        // HTML LAYERS
+        panelsArray.forEach(pData => {
+            const p = document.createElement('div'); p.className = 'led-panel';
+            const tileAbsX = wall.x + pData.x; const tileAbsY = wall.y + pData.y;
+            p.style.left = pData.x + 'px'; p.style.top = pData.y + 'px'; p.style.width = pData.w + 'px'; p.style.height = pData.h + 'px';
+            
+            let dInfo = dataMap[pData.id]; let pInfo = powerMap[pData.id]; let isAlt = pData.type === 'alt';
+            let isUnpatched = (!dInfo && !pInfo);
+            
+            p.dataset.w = wIndex; p.dataset.id = pData.id;
+
+            let hue = ((pData.baseR * wall.cols + pData.baseC) * 47) % 360; 
+            let colors = dInfo ? getColors(dInfo.procIdx, hue) : { bg: '#111', border: '#333' };
+
+            if (isDrawing) {
+                p.style.backgroundColor = '#161616'; p.style.borderColor = '#444';
+                if (activePatchType === 'layout') { p.style.backgroundColor = isAlt ? 'rgba(0, 136, 255, 0.2)' : '#16161a'; p.style.borderColor = isAlt ? 'var(--accent)' : '#444'; } 
+                else if (activePatchType === 'data' && dInfo) { p.style.borderColor = 'var(--success)'; p.style.backgroundColor = 'rgba(0, 204, 136, 0.1)'; } 
+                else if (activePatchType === 'power' && pInfo) { const phaseColor = pInfo.phase === 1 ? 'var(--phase-l1)' : (pInfo.phase === 2 ? 'var(--phase-l2)' : 'var(--phase-l3)'); p.style.borderColor = phaseColor; p.style.backgroundColor = `rgba(255, 255, 255, 0.05)`; }
+                else if (activePatchType === 'stackframe' || activePatchType === 'rigging') { p.style.backgroundColor = '#111'; p.style.borderColor = '#222'; }
+                
+                p.onmousedown = (e) => { 
+                    isPatchDragging = true; lastDraggedTileStr = pData.id; 
+                    if(activePatchType === 'stackframe') { 
+                        let arr = activeStackTool === 'ladder_1m' ? wall.stack.ladders_1m : (activeStackTool === 'ladder_05m' ? wall.stack.ladders_05m : wall.stack[activeStackTool + 's']);
+                        window.patchDrawAction = arr.includes(pData.id) ? 'remove' : 'add'; 
+                    }
+                    window.handleTileClick(wIndex, pData.id); e.stopPropagation(); 
+                };
+            } else {
+                if (isUnpatched && !showHwViewGlobally) {
+                    p.style.backgroundColor = '#000'; p.style.borderColor = '#fff';
+                } else {
+                    p.style.backgroundColor = showHwViewGlobally ? '#111' : colors.bg; 
+                    p.style.borderColor = showHwViewGlobally ? '#222' : (isAlt ? 'var(--accent)' : colors.border);
+                }
+            }
+            
+            let stackHTML = '';
+            if (wall.mount === 'stack') {
+                if (bottomTiles.find(b => b.id === pData.id)) stackHTML += `<div class="stack-foot"></div>`;
+                if (wall.stack.bases.includes(pData.id)) stackHTML += `<div class="stack-base"></div>`;
+                
+                let pxPerMmY = pData.h / pData.physH;
+                
+                if (wall.stack.ladders_1m.includes(pData.id)) {
+                    let lHeight = 1000 * pxPerMmY;
+                    stackHTML += `<div class="stack-ladder stack-ladder-1m" style="height:${lHeight}px;"></div>`;
+                }
+                if (wall.stack.ladders_05m.includes(pData.id)) {
+                    let lHeight = 500 * pxPerMmY;
+                    stackHTML += `<div class="stack-ladder stack-ladder-05m" style="height:${lHeight}px;"></div>`;
+                }
+                if (wall.stack.fliepels.includes(pData.id)) stackHTML += `<div class="stack-fliepel"></div>`;
+            }
+            p.innerHTML = stackHTML;
+            wDiv.appendChild(p);
+
+            const tDiv = document.createElement('div'); tDiv.className = 'text-overlay'; tDiv.setAttribute('data-wall', wIndex);
+            tDiv.style.left = tileAbsX + 'px'; tDiv.style.top = tileAbsY + 'px'; tDiv.style.width = pData.w + 'px'; tDiv.style.height = pData.h + 'px';
+
+            let conf = dInfo ? db.procs.find(x => x.id === projectProcs[dInfo.procIdx]?.dbId) : null;
+
+            if (isDrawing && activePatchType !== 'layout' && activePatchType !== 'stackframe' && activePatchType !== 'rigging') {
+                if (activePatchType === 'data' && dInfo) { tDiv.innerHTML = `<div class="patch-bg" style="font-size:16px; font-weight:bold; color:var(--success); display:flex;">${formatPortLabel(conf, dInfo.port, true)},${dInfo.tile}</div>`; }
+                else if (activePatchType === 'power' && pInfo) { const phaseColor = pInfo.phase === 1 ? 'var(--phase-l1)' : (pInfo.phase === 2 ? 'var(--phase-l2)' : 'var(--phase-l3)'); tDiv.innerHTML = `<div class="patch-bg" style="font-size:16px; font-weight:bold; color:${phaseColor}; display:flex;">L${pInfo.phase}</div>`; }
+            } else if (!showHwViewGlobally) {
+                let dText = dInfo ? `${formatPortLabel(conf, dInfo.port, false)},${dInfo.tile}` : `--`; let pText = pInfo ? `L${pInfo.phase}` : `--`;
+                let phaseColor = pInfo ? (pInfo.phase === 1 ? 'var(--phase-l1)' : (pInfo.phase === 2 ? 'var(--phase-l2)' : 'var(--phase-l3)')) : '#555';
+                let dataColor = dInfo ? `hsl(${(dInfo.port * 75) % 360}, 100%, 70%)` : '#555';
+                let textColor = (isUnpatched) ? '#aaa' : (dInfo ? '#fff' : '#555');
+
+                if (dimDataCables) dataColor = 'rgba(255, 255, 255, 0.15)'; 
+                if (dimPowerCables) phaseColor = 'rgba(255, 255, 255, 0.15)';
+
+                let patchBgStyle = isUnpatched ? 'display:none;' : 'display:flex;';
+
+                tDiv.innerHTML = `
+                  <div class="coord-text" style="position:absolute; top:2px; left:2px; font-size:9px; text-align:left; line-height:1.2; color:${textColor}; z-index:10;">
+                    ${pData.baseR + 1},${pData.baseC + 1}<br>TL:${tileAbsX},${tileAbsY}
+                    ${isAlt ? `<br><span style="color:var(--accent);">ALT</span>` : ''}
+                  </div>
+                  <div class="patch-bg" style="${patchBgStyle} flex-direction:column; align-items:center; gap:2px; margin-top:8px; z-index:10;">
+                    <div class="d-text" style="font-size:12px; font-weight:bold; color:${dataColor};">D: ${dText}</div>
+                    <div class="p-text" style="font-size:10px; font-weight:bold; color:${phaseColor};">P: ${pText}</div>
+                  </div>
+                `;
+            }
+            textLayer.appendChild(tDiv);
+        });
+        wallLayer.appendChild(wDiv);
+
+        const dataOffset = (cableMode === 'both') ? -4 : 0; const pwrOffset = (cableMode === 'both') ? 4 : 0;
+        if(cableMode === 'data' || cableMode === 'both') {
+          dataPaths.forEach((path) => {
+            if(path.tiles.length === 0) return;
+            const portColor = dimDataCables ? 'rgba(100, 100, 100, 0.3)' : `hsl(${(path.port * 75) % 360}, 100%, 50%)`;
+            let conf = db.procs.find(x => x.id === projectProcs[path.procIdx]?.dbId);
+            let portCoords = path.tiles.map(tId => { let pData = panelsArray.find(p => p.id === tId); return { cx: wall.x + pData.x + (pData.w / 2), cy: wall.y + pData.y + (pData.h / 2) }; });
+            const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+            polyline.setAttribute('points', portCoords.map(p => `${p.cx + dataOffset},${p.cy + dataOffset}`).join(' '));
+            polyline.setAttribute('class', 'data-cable'); polyline.setAttribute('stroke', portColor); polyline.setAttribute('data-wall', wIndex);
+            cableLayer.appendChild(polyline);
+            cableLayer.appendChild(createSVGMarker(portCoords[0].cx + dataOffset, portCoords[0].cy + dataOffset, formatPortLabel(conf, path.port, true), portColor, 'circle', 'data-marker', wIndex, dimDataCables));
+            if(portCoords.length > 1) cableLayer.appendChild(createSVGMarker(portCoords[portCoords.length-1].cx + dataOffset, portCoords[portCoords.length-1].cy + dataOffset, formatPortLabel(conf, path.port, true), portColor, 'rect', 'data-marker', wIndex, dimDataCables));
+          });
+        }
+        if(cableMode === 'power' || cableMode === 'both') {
+          powerPaths.forEach((path) => {
+            if(path.tiles.length === 0) return;
+            const phase = ((path.group - 1) % 3) + 1; const phaseColor = dimPowerCables ? 'rgba(100, 100, 100, 0.3)' : (phase === 1 ? '#ff3366' : (phase === 2 ? '#33ccff' : '#ffcc00'));
+            let pwrCoords = path.tiles.map(tId => { let pData = panelsArray.find(p => p.id === tId); return { cx: wall.x + pData.x + (pData.w / 2), cy: wall.y + pData.y + (pData.h / 2) }; });
+            const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
+            polyline.setAttribute('points', pwrCoords.map(p => `${p.cx + pwrOffset},${p.cy + pwrOffset}`).join(' '));
+            polyline.setAttribute('class', 'power-cable'); polyline.setAttribute('stroke', phaseColor); polyline.setAttribute('data-wall', wIndex);
+            cableLayer.appendChild(polyline);
+            cableLayer.appendChild(createSVGMarker(pwrCoords[0].cx + pwrOffset, pwrCoords[0].cy + pwrOffset, 'L'+phase, phaseColor, 'circle', 'power-marker', wIndex, dimPowerCables));
+          });
+        }
+
+        let btnsHtml = '';
+        if (isDrawing) {
+            btnsHtml = `<div style="display:flex; gap:5px; margin-top:8px;"><button class="success" onclick="stopManualPatch()" style="flex:1;">✅ Opslaan & Sluiten</button></div>`;
+        } else {
+            let activeDH = wall.dataMode === 'H' ? 'background:var(--accent); color:white; border-color:var(--accent);' : ''; let activeDV = wall.dataMode === 'V' ? 'background:var(--accent); color:white; border-color:var(--accent);' : ''; let activeDM = wall.dataMode === 'M' ? 'background:var(--success); color:#000; border-color:var(--success);' : ''; let activePM = wall.powerMode === 'M' ? 'background:var(--warning); color:#000; border-color:var(--warning);' : '';
+            let layoutBtn = wall.led.hasAlt ? `<button class="outline" style="padding:6px; font-size:10px; flex:1; color:var(--accent);" onclick="setLayoutMode(${wIndex})">📐 Mix Formaat</button>` : '';
+
+            btnsHtml = `<div style="display:flex; gap:5px; margin-top:8px;">
+                <button class="outline" style="padding:6px; font-size:10px; flex:1; ${activeDH}" onclick="setDataMode(${wIndex}, 'H')">Data H</button>
+                <button class="outline" style="padding:6px; font-size:10px; flex:1; ${activeDV}" onclick="setDataMode(${wIndex}, 'V')">Data V</button>
+                <button class="outline" style="padding:6px; font-size:10px; flex:1; ${activeDM}; color:var(--success);" onclick="setDataMode(${wIndex}, 'M')">🖐️ Data</button>
+                <button class="outline" style="padding:6px; font-size:10px; flex:1; ${activePM}; color:var(--warning); border-color:var(--warning);" onclick="setPowerMode(${wIndex}, 'M')">🖐️ Stroom</button>
+              </div>
+              <div style="display:flex; gap:5px; margin-top:5px;">
+                ${wall.powerMode === 'M' ? `<button class="outline" style="padding:4px; font-size:10px; flex:1;" onclick="setPowerMode(${wIndex}, 'AUTO')">Auto ⚡</button>` : ''}
+                ${layoutBtn}
+              </div>
+              <div style="display:flex; gap:5px; margin-top:5px; align-items:center;">
+                <span style="font-size:10px; color:#888;">Montage:</span>
+                <select style="flex:1; padding:4px; font-size:10px;" onchange="setMountMode(${wIndex}, this.value)">
+                    <option value="hang" ${wall.mount==='hang'?'selected':''}>Hangen</option>
+                    <option value="stack" ${wall.mount==='stack'?'selected':''}>Stacken</option>
+                </select>
+                ${wall.mount === 'stack' ? `<button class="outline" style="padding:4px; font-size:10px; flex:1; color:#fff;" onclick="setStackMode(${wIndex})">🏗️ Frame</button>` : `<button class="outline" style="padding:4px; font-size:10px; flex:1; color:#fff;" onclick="setRiggingMode(${wIndex})">⛓️ Rigging</button>`}
+              </div>`;
+        }
+
+        let uiDataPorts = dataLegendItems.map(item => `<div style="font-size:10px; margin-top:3px; color:#ccc;">${item.replace('class="color-box"', 'class="color-box" style="width:8px;height:8px;"')}</div>`).join('');
+        let uiPowerGroups = powerLegendItems.map(item => `<div style="font-size:10px; margin-top:3px; color:#ccc;">${item.replace('class="color-box"', 'class="color-box" style="width:8px;height:8px;"')}</div>`).join('');
+
+        calcData.html += `<div class="card" ${isDrawing ? 'style="border-color:var(--success);"' : ''}>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+              <span style="font-weight:bold; font-size:14px; color:var(--accent); cursor:pointer;" onclick="editWall(${wIndex})" title="Bewerk eigenschappen">✏️ ${wall.id}</span> 
+              <div>
+                 <button class="outline" onclick="editWall(${wIndex})" style="width:auto; padding:2px 6px; font-size:11px; margin-right:4px; border:none;" title="Bewerk eigenschappen">✏️</button>
+                 <button class="danger" onclick="removeWall(${wIndex})" style="width:auto; padding:3px 8px; font-size:11px;">X</button>
+              </div>
+            </div>
+            <div class="card-stat"><span>Afmeting:</span> <span>${wallW} x ${wallH} px</span></div>
+            <div class="card-stat"><span>Data:</span> ${wall.dataMode === 'M' ? `<span style="color:var(--warning)">Gepatcht</span>` : `<span style="color:var(--success)">${dataPaths.length} Poorten</span>`}</div>
+            <div class="card-stat"><span>Stroom:</span> ${wall.powerMode === 'M' ? `<span style="color:var(--warning)">Gepatcht</span>` : `<span style="color:var(--warning)">${powerPaths.length} Groepen</span>`}</div>
+            ${btnsHtml}
+            <details style="margin-top:8px; padding:8px; background:#000; border:1px solid #222; border-radius:4px;">
+              <summary style="font-size:10px; color:var(--text-muted); margin:-8px; padding:8px;">Bekijk Details</summary>
+              <div style="margin-top:8px;">
+                <strong style="color:var(--success); font-size:11px;">Data:</strong>${uiDataPorts}
+                <strong style="color:var(--warning); display:block; margin-top:8px; font-size:11px;">Stroom:</strong>${uiPowerGroups}
+                <strong style="color:var(--accent); display:block; margin-top:8px; font-size:11px;">Bekabeling (Links):</strong><div style="font-size:10px; color:#ccc;">${dLinks}x Ethercon Link<br>${pLinks}x Powercon True1 Link</div>
+                ${wall.mount === 'stack' ? `<strong style="color:#aaa; display:block; margin-top:8px; font-size:11px;">Stackframe Componenten:</strong><div style="font-size:10px; color:#ccc;">${wall.stack.ladders_1m.length}x Ladder(1m)<br>${wall.stack.ladders_05m.length}x Ladder(0.5m)<br>${wall.stack.bases.length}x Baseplate<br>${bottomTiles.length}x Voetje<br>${wall.stack.fliepels.length}x Fliepel</div>` : ''}
+              </div>
+            </details>
+          </div>`;
+      });
+
+      const banner = document.getElementById('patch-instruction');
+      if (activePatchWall !== null && activePatchType !== null) {
+        banner.style.display = 'block'; const wall = walls[activePatchWall];
+        
+        if (activePatchType === 'stackframe') {
+            banner.className = 'patch-instruction stack';
+            banner.innerHTML = `<div style="display:flex; align-items:center; gap:20px;">
+              <div style="text-align:left; display:flex; flex-direction:column; gap:5px;"><span style="font-size:13px;">🏗️ Teken Stackframe (${wall.id})</span>
+                  <select onchange="setActiveStackTool(this.value);" style="background:#fff; color:#000; padding:2px; font-size:11px;">
+                      <option value="base" ${activeStackTool==='base'?'selected':''}>1. Bases (Vloerdelen)</option>
+                      <option value="ladder_1m" ${activeStackTool==='ladder_1m'?'selected':''}>2. Ladder (1 Meter)</option>
+                      <option value="ladder_05m" ${activeStackTool==='ladder_05m'?'selected':''}>3. Ladder (0.5 Meter)</option>
+                      <option value="fliepel" ${activeStackTool==='fliepel'?'selected':''}>4. Fliepels (Verbindingen)</option>
+                  </select></div>
+              <div style="display:flex; flex-direction:column; gap:5px;"><span style="font-size:11px;">(Voetjes gaan automatisch!)</span><button onclick="stopManualPatch()" style="background:#fff; color:#000; border:none; padding:4px 12px; border-radius:4px; font-weight:bold; cursor:pointer; font-size:11px;">✅ Klaar met Bouwen</button></div>
+            </div>`;
+        } else if (activePatchType === 'rigging') {
+            let panelsArray = getWallPanels(wall);
+            let totalRiggingKg = 0;
+            panelsArray.forEach(p => totalRiggingKg += p.kg);
+            totalRiggingKg += panelsArray.length * 0.25; 
+            
+            let colIdx = 0;
+            while(colIdx < wall.cols) {
+                let isTwo = (wall.cols - colIdx) >= 2;
+                if(isTwo) { totalRiggingKg += 28; colIdx += 2; } else { totalRiggingKg += 14; colIdx += 1; }
+            }
+            
+            let activeCount = wall.activeHangPoints.length;
+            let maxLoad = 0;
+
+            if (activeCount > 0) {
+                let colXCoords = []; let currentX = 0;
+                for(let c=0; c<wall.cols; c++) {
+                    let topPanel = panelsArray.find(p => p.baseR === 0 && p.baseC === c);
+                    let pWidth = topPanel ? topPanel.w : wall.led.pxW;
+                    colXCoords.push({ c: c, x: currentX, w: pWidth, cx: currentX + (pWidth/2) });
+                    currentX += pWidth;
+                }
+                let wallW = currentX;
+                let activePoints = [...wall.activeHangPoints].sort((a,b)=>a-b);
+                let q = totalRiggingKg / wallW; 
+                
+                for(let i=0; i<activeCount; i++) {
+                    let c = activePoints[i];
+                    let ptX = colXCoords[c].cx;
+                    let leftBound = (i === 0) ? 0 : (ptX + colXCoords[activePoints[i-1]].cx) / 2;
+                    let rightBound = (i === activeCount - 1) ? wallW : (ptX + colXCoords[activePoints[i+1]].cx) / 2;
+                    let load = q * (rightBound - leftBound);
+                    if(load > maxLoad) maxLoad = load;
+                }
+            }
+            
+            banner.className = 'patch-instruction stack';
+            banner.innerHTML = `<div style="display:flex; align-items:center; gap:20px;">
+              <div style="text-align:left; display:flex; flex-direction:column; gap:5px;">
+                  <span style="font-size:16px;">⛓️ Bepaal Hangpunten (${wall.id})</span>
+                  <span style="font-size:12px; color:#ccc;">Klik op de hijsogen om ze aan/uit te zetten.</span>
+              </div>
+              <div style="text-align:center; display:flex; gap:15px; background:rgba(0,0,0,0.3); padding:8px 20px; border-radius:6px;">
+                  <div><span style="font-size:11px; color:#aaa; display:block;">Scherm + Frame</span><span style="font-size:20px; font-weight:bold; color:#fff;">${totalRiggingKg.toFixed(1)} kg</span></div>
+                  <div><span style="font-size:11px; color:#aaa; display:block;">Actieve Punten</span><span style="font-size:20px; font-weight:bold; color:var(--accent);">${activeCount}</span></div>
+                  <div style="border-left:1px solid #555; padding-left:15px;">
+                      <span style="font-size:11px; color:#aaa; display:block;">Max. Puntlast <b style="color:#fff">(WLL)</b></span>
+                      <span style="font-size:24px; font-weight:bold; color:${maxLoad > 500 ? 'var(--danger)' : 'var(--success)'};">${maxLoad.toFixed(1)} kg</span>
+                  </div>
+              </div>
+              <div><button onclick="stopManualPatch()" style="background:#fff; color:#000; border:none; padding:8px 16px; border-radius:4px; font-weight:bold; cursor:pointer; font-size:14px;">✅ Klaar met Bouwen</button></div>
+            </div>`;
+        } else if (activePatchType === 'layout') {
+            banner.className = 'patch-instruction layout';
+            banner.innerHTML = `<strong>📐 Wissel Formaat Modus (${wall.id})</strong><br><span style="font-size:12px;">Klik op tegels om ze in Alt-formaat te veranderen!</span><br><button onclick="stopManualPatch()" style="background:#fff; color:#000; border:none; padding:4px 12px; border-radius:4px; font-weight:bold; cursor:pointer; font-size:11px; margin-top:5px;">✅ Klaar met Bouwen</button>`;
+        } else if (activePatchType === 'data') {
+          let cProc = document.getElementById('draw-proc-sel') ? parseInt(document.getElementById('draw-proc-sel').value) : 0;
+          let cPort = document.getElementById('draw-port-sel') ? parseInt(document.getElementById('draw-port-sel').value) : 1;
+          let pathObj = wall.customData.find(p => p.procIdx === cProc && p.port === cPort);
+          let conf = db.procs.find(x => x.id === projectProcs[cProc]?.dbId); let maxPxPort = conf ? conf.px : 650000;
+          
+          let usedPx = 0; const panelsArray = getWallPanels(wall);
+          if (pathObj) pathObj.tiles.forEach(tId => usedPx += panelsArray.find(p=>p.id===tId).px);
+          
+          let procOpts = ''; projectProcs.forEach((pp, i) => procOpts += `<option value="${i}" ${i===cProc?'selected':''}>Proc ${i+1}</option>`);
+          let portOpts = ''; let maxPorts = conf ? conf.ports : 20;
+          for(let i=1; i<=maxPorts; i++) { let lbl = usedPorts[cProc] && usedPorts[cProc][i] ? `(Gebruikt)` : `(Vrij)`; portOpts += `<option value="${i}" ${i===cPort?'selected':''}>Poort ${formatPortLabel(conf, i, false)} ${lbl}</option>`; }
+
+          banner.className = 'patch-instruction data';
+          banner.innerHTML = `<div style="display:flex; align-items:center; gap:20px;">
+              <div style="text-align:left; display:flex; flex-direction:column; gap:5px;"><span style="font-size:13px;">🖐️ Teken Data (${wall.id})</span><div style="display:flex; gap:5px;"><select id="draw-proc-sel" style="background:#fff; color:#000; padding:6px; font-size:14px; border-radius:4px;" onchange="handleBannerProcChange()">${procOpts}</select><select id="draw-port-sel" style="background:#fff; color:#000; padding:6px; font-size:14px; border-radius:4px;" onchange="handleBannerPortChange()">${portOpts}</select></div></div>
+              <div style="text-align:center;"><span style="font-size:24px; font-weight:900; background:rgba(0,0,0,0.2); padding:4px 15px; border-radius:6px; display:inline-block; color:${usedPx>=maxPxPort?'#fff':'#000'};">${usedPx.toLocaleString()} / ${maxPxPort.toLocaleString()} px</span></div>
+              <div style="display:flex; flex-direction:column; gap:5px;"><button onclick="forceNewCable()" style="background:#fff; color:#000; border:none; padding:8px 16px; border-radius:4px; font-weight:bold; cursor:pointer; font-size:14px;">✂️ Nieuwe Kabel</button><button onclick="undoPatch()" style="background:rgba(0,0,0,0.6); color:#fff; border:none; padding:8px 16px; border-radius:4px; font-weight:bold; cursor:pointer; font-size:14px;">↩️ Undo Laatste</button></div>
+            </div>`;
+        } else {
+          let cGrp = document.getElementById('draw-group-sel') ? parseInt(document.getElementById('draw-group-sel').value) : 1;
+          let pathObj = wall.customPower.find(p => p.group === cGrp);
+          let usedWatt = 0; const panelsArray = getWallPanels(wall);
+          if (pathObj) pathObj.tiles.forEach(tId => usedWatt += panelsArray.find(p=>p.id===tId).watt);
+          
+          banner.className = 'patch-instruction power';
+          banner.innerHTML = `<div style="display:flex; align-items:center; gap:20px;">
+              <div style="text-align:left; display:flex; flex-direction:column; gap:5px;"><span style="font-size:13px;">⚡ Teken Stroom (${wall.id})</span><input type="number" id="draw-group-sel" value="${cGrp}" min="1" onchange="renderCanvas()" style="background:#fff; color:#000; padding:6px; font-size:14px; width:100px; border-radius:4px;"></div>
+              <div style="text-align:center;"><span style="font-size:24px; font-weight:900; background:rgba(0,0,0,0.2); padding:4px 15px; border-radius:6px; display:inline-block; color:${usedWatt>=MAX_POWER_PER_GROUP?'#fff':'#000'};">${usedWatt.toLocaleString()} / ${MAX_POWER_PER_GROUP.toLocaleString()} W</span></div>
+              <div style="display:flex; flex-direction:column; gap:5px;"><button onclick="forceNewCable()" style="background:#fff; color:#000; border:none; padding:8px 16px; border-radius:4px; font-weight:bold; cursor:pointer; font-size:14px;">✂️ Nieuwe Kabel</button><button onclick="undoPatch()" style="background:rgba(0,0,0,0.6); color:#fff; border:none; padding:8px 16px; border-radius:4px; font-weight:bold; cursor:pointer; font-size:14px;">↩️ Undo Laatste</button></div>
+            </div>`;
+        }
+      } else { banner.style.display = 'none'; }
+
+      // Sync bomTotals with calculated totals
+      bomTotals.px = calcData.px;
+      bomTotals.kg = calcData.kg;
+      bomTotals.watt = calcData.watt;
+
+      document.getElementById('wall-list-container').innerHTML = calcData.html; 
+      document.getElementById('tot_px').innerText = calcData.px.toLocaleString(); 
+      document.getElementById('tot_kg').innerText = calcData.kg.toFixed(1) + ' kg';
+      document.getElementById('pwr_l1').innerText = `${calcData.l1W.toLocaleString()} W (${calcData.l1G} gr)`; 
+      document.getElementById('pwr_l2').innerText = `${calcData.l2W.toLocaleString()} W (${calcData.l2G} gr)`; 
+      document.getElementById('pwr_l3').innerText = `${calcData.l3W.toLocaleString()} W (${calcData.l3G} gr)`;
+      document.getElementById('tot_w').innerText = (calcData.l1W + calcData.l2W + calcData.l3W).toLocaleString() + ' W';
+      document.getElementById('tot_oob').innerText = calcData.oob > 0 ? calcData.oob.toLocaleString() + ' px' : '0 px (Perfect)';
+      
+      document.getElementById('tot_stack').innerText = `${bomTotals.l1m} / ${bomTotals.l05m}`;
+      document.getElementById('tot_bars').innerText = `${bomTotals.bars2} / ${bomTotals.bars1}`;
+      document.getElementById('tot_feet_eyes').innerText = `${bomTotals.feet} / ${bomTotals.activeShackles}`;
+      document.getElementById('tot_bases_fliepels').innerText = `${bomTotals.bases} / ${bomTotals.fliepels}`;
+      document.getElementById('tot_links').innerText = `${bomTotals.ethercon} / ${bomTotals.powercon}`;
+    }
+
+    window.generatePDF = async function() {
+        const { jsPDF } = window.jspdf; const pdf = new jsPDF('landscape', 'mm', 'a4');
+        const wrapper = document.getElementById('canvas-wrapper'); const container = document.getElementById('canvas-container');
+        const originalTransform = wrapper.style.transform;
+        
+        wrapper.style.transform = 'scale(1)'; workspace.scrollLeft = 0; workspace.scrollTop = 0; 
+        document.body.style.cursor = 'wait';
+        const btn = document.getElementById('btn-pdf'); btn.innerText = "Genereren..."; btn.disabled = true;
+
+        const pName = document.getElementById('pi_name').value || 'Onbekend Project'; const pLoc = document.getElementById('pi_loc').value || 'Onbekend';
+        const pDate = document.getElementById('pi_date').value || 'Onbekend'; const pTech = document.getElementById('pi_tech').value || 'Onbekend';
+
+        const addPageToPDF = async (title, addPage = true, customX = null, customY = null, customW = null, customH = null) => {
+            if (addPage) pdf.addPage();
+            pdf.setFontSize(16); pdf.setTextColor(0, 136, 255); pdf.text(`Pixelmap by MTR - ${title}`, 10, 12);
+            pdf.setFontSize(10); pdf.setTextColor(100, 100, 100); pdf.text(`Project: ${pName}  |  Locatie: ${pLoc}  |  Datum: ${pDate}  |  Tech: ${pTech}`, 10, 18);
+
+            let maxCanvasRes = 3000;
+            let currentScale = 1;
+            
+            let targetW = customW !== null ? customW : parseInt(document.getElementById('canW').value);
+            let targetH = customH !== null ? customH : parseInt(document.getElementById('canH').value);
+
+            if (targetW > maxCanvasRes) { currentScale = maxCanvasRes / targetW; }
+            if (targetH > maxCanvasRes && (maxCanvasRes / targetH) < currentScale) { currentScale = maxCanvasRes / targetH; }
+
+            let options = { scale: currentScale, backgroundColor: customX !== null ? '#ffffff' : '#12141c', logging: false };
+            if(customX !== null) { options.x = customX; options.y = customY; options.width = customW; options.height = customH; }
+
+            const canvas = await html2canvas(container, options);
+            const imgData = canvas.toDataURL('image/jpeg', 0.85);
+            const pdfWidth = 297; const pdfHeight = 210; const margin = 10;
+            const aW = pdfWidth - (margin * 2); const aH = pdfHeight - 25; 
+            
+            let finalW = aW; let finalH = (canvas.height * aW) / canvas.width;
+            if (finalH > aH) { finalH = aH; finalW = (canvas.width * aH) / canvas.height; }
+            pdf.addImage(imgData, 'JPEG', margin + ((aW - finalW) / 2), 22 + ((aH - finalH) / 2), finalW, finalH);
+        };
+
+        try {
+            document.getElementById('cableViewMode').value = 'both'; renderCanvas();
+            await new Promise(r => setTimeout(r, 100)); 
+            
+            let overviewX = 0, overviewY = 0, overviewW = parseInt(document.getElementById('canW').value), overviewH = parseInt(document.getElementById('canH').value);
+            if(walls.length > 0) {
+                let minX = Math.min(...walls.map(w => w.x)); let minY = Math.min(...walls.map(w => w.y));
+                let maxX = Math.max(...walls.map(w => { let wW = 0; getWallPanels(w).forEach(p => { if (p.x + p.w > wW) wW = p.x + p.w; }); return w.x + wW; }));
+                let maxY = Math.max(...walls.map(w => { let wH = 0; getWallPanels(w).forEach(p => { if (p.y + p.h > wH) wH = p.y + p.h; }); return w.y + wH; }));
+                let pad = 200;
+                overviewX = minX - pad; overviewY = minY - pad;
+                overviewW = (maxX - minX) + (pad*2); overviewH = (maxY - minY) + (pad*2);
+            }
+            await addPageToPDF('Totaal Overzicht (Kleur)', false, overviewX, overviewY, overviewW, overviewH);
+            
+            container.classList.add('export-screen-mode');
+            
+            for (let i = 0; i < walls.length; i++) {
+                const wall = walls[i];
+                const panelsArray = getWallPanels(wall);
+                let wallW = 0; let wallH = 0;
+                panelsArray.forEach(p => { if (p.x + p.w > wallW) wallW = p.x + p.w; if (p.y + p.h > wallH) wallH = p.y + p.h; });
+                
+                const padding = 150;
+                container.querySelectorAll('[data-wall]').forEach(el => {
+                    if (el.getAttribute('data-wall') == i) el.style.visibility = 'visible'; else el.style.visibility = 'hidden';
+                });
+
+                let cX = wall.x - padding; let cY = wall.y - padding;
+                let cW = wallW + (padding * 2); let cH = wallH + (padding * 2) + 60; 
+
+                container.classList.add('export-data-only');
+                await addPageToPDF(`Data Patch - ${wall.id}`, true, cX, cY, cW, cH);
+                container.classList.remove('export-data-only');
+
+                container.classList.add('export-power-only');
+                await addPageToPDF(`Stroom Patch - ${wall.id}`, true, cX, cY, cW, cH);
+                container.classList.remove('export-power-only');
+                
+                container.classList.add('export-hw-only');
+                let hwTitle = wall.mount === 'stack' ? `Stackframe Hardware - ${wall.id}` : `Rigging Hardware - ${wall.id}`;
+                
+                // ZORGT ERVOOR DAT DE HARDWARE (EN LABELS) NOOIT WORDEN AFGESNEDEN!
+                await addPageToPDF(hwTitle, true, cX, cY - 150, cW, cH + 150);
+                container.classList.remove('export-hw-only');
+            }
+            
+            // PAKBON PAGINA
+            pdf.addPage();
+            pdf.setFontSize(22); pdf.setTextColor(0, 0, 0); pdf.text(`Pakbon / Bill of Materials`, 20, 30);
+            pdf.setFontSize(10); pdf.setTextColor(100, 100, 100); pdf.text(`Project: ${pName}  |  Gegenereerd op: ${new Date().toLocaleDateString()}`, 20, 38);
+            
+            let cursorY = 60;
+            pdf.setFontSize(14); pdf.setTextColor(0, 136, 255); pdf.text(`LED Panelen`, 20, cursorY); cursorY += 10;
+            pdf.setFontSize(12); pdf.setTextColor(0, 0, 0);
+            for (const [key, val] of Object.entries(bomTotals.ledTypes)) { pdf.text(`${val}x  -  ${key}`, 25, cursorY); cursorY += 8; }
+            
+            cursorY += 10;
+            pdf.setFontSize(14); pdf.setTextColor(0, 136, 255); pdf.text(`Processoren (Controllers)`, 20, cursorY); cursorY += 10;
+            pdf.setFontSize(12); pdf.setTextColor(0, 0, 0);
+            for (const [key, val] of Object.entries(bomTotals.procTypes)) { pdf.text(`${val}x  -  ${key}`, 25, cursorY); cursorY += 8; }
+            
+            cursorY += 10;
+            pdf.setFontSize(14); pdf.setTextColor(0, 136, 255); pdf.text(`Bekabeling & Hardware`, 20, cursorY); cursorY += 10;
+            pdf.setFontSize(12); pdf.setTextColor(0, 0, 0);
+            if (bomTotals.ethercon > 0) { pdf.text(`${bomTotals.ethercon}x  -  Ethercon Link (Tegel tot Tegel)`, 25, cursorY); cursorY += 8; }
+            if (bomTotals.powercon > 0) { pdf.text(`${bomTotals.powercon}x  -  Powercon True1 Link`, 25, cursorY); cursorY += 8; }
+            if (bomTotals.l1m > 0) { pdf.text(`${bomTotals.l1m}x  -  Laddertruss (1m)`, 25, cursorY); cursorY += 8; }
+            if (bomTotals.l05m > 0) { pdf.text(`${bomTotals.l05m}x  -  Laddertruss (0.5m)`, 25, cursorY); cursorY += 8; }
+            if (bomTotals.bases > 0) { pdf.text(`${bomTotals.bases}x  -  Baseplates`, 25, cursorY); cursorY += 8; }
+            if (bomTotals.feet > 0) { pdf.text(`${bomTotals.feet}x  -  Voetjes (Footpads)`, 25, cursorY); cursorY += 8; }
+            if (bomTotals.fliepels > 0) { pdf.text(`${bomTotals.fliepels}x  -  Fliepels (Verbindingen)`, 25, cursorY); cursorY += 8; }
+            if (bomTotals.bars2 > 0) { pdf.text(`${bomTotals.bars2}x  -  Bumperbar (2-breed, 28kg)`, 25, cursorY); cursorY += 8; }
+            if (bomTotals.bars1 > 0) { pdf.text(`${bomTotals.bars1}x  -  Bumperbar (1-breed, 14kg)`, 25, cursorY); cursorY += 8; }
+            if (bomTotals.activeShackles > 0) { pdf.text(`${bomTotals.activeShackles}x  -  Hijsogen / Shackles`, 25, cursorY); cursorY += 8; }
+            
+            cursorY += 15;
+            pdf.setFontSize(10); pdf.setTextColor(150, 150, 150);
+            pdf.text(`Totale Pixels: ${bomTotals.px.toLocaleString()}`, 20, cursorY); cursorY += 6;
+            pdf.text(`Totaal Gewicht (incl. frame & bekabeling 0.25kg/tegel): ${bomTotals.kg.toFixed(1)} kg`, 20, cursorY); cursorY += 6;
+            pdf.text(`Stroom (Max): ${bomTotals.watt.toLocaleString()} Watt`, 20, cursorY);
+
+            pdf.save(`Pixelmap_${pName.replace(/\s+/g, '_')}.pdf`);
+        } catch(e) { console.error(e); alert("Fout bij genereren PDF. " + e.message); } 
+        finally { 
+            container.querySelectorAll('[data-wall]').forEach(el => el.style.visibility = '');
+            container.classList.remove('export-screen-mode');
+            wrapper.style.transform = originalTransform; document.body.style.cursor = 'default'; btn.innerText = "📄 Genereer PDF Werktekening & Pakbon"; btn.disabled = false; 
+        }
+    };
+
+    refreshDropdowns(); init();
   </script>
 </body>
 </html>
