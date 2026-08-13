@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pixelmap by MTR - V46 (Live Supabase Sync)</title>
+  <title>Pixelmap by MTR - V48 (Cloud Status Indicator)</title>
   
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -31,8 +31,10 @@
     #workspace.dragging { cursor: grabbing; }
     #sidebar-right { width: 360px; min-width: 360px; max-width: 360px; background: var(--bg-panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; z-index: 50; box-shadow: -2px 0 20px rgba(0,0,0,0.5); overflow-y: auto; }
 
-    .panel-header { padding: 18px 15px; background: #0a0a0c; border-bottom: 1px solid var(--border); font-weight: 800; font-size: 16px; text-transform: uppercase; letter-spacing: 2px; color: var(--accent); position: sticky; top: 0; z-index: 10; }
-    .panel-content { padding: 15px; display: flex; flex-direction: column; gap: 8px; }
+    .panel-header { padding: 18px 15px; background: #0a0a0c; border-bottom: 1px solid var(--border); font-weight: 800; font-size: 16px; text-transform: uppercase; letter-spacing: 2px; color: var(--accent); position: sticky; top: 0; z-index: 10; display: flex; justify-content: space-between; align-items: center; }
+    #cloud-sync-indicator { font-size: 11px; font-weight: normal; text-transform: none; color: var(--text-muted); transition: 0.3s; }
+    
+    .panel-content { padding: 15px; display: flex; flex-direction: column; gap: 8px; flex: 1; }
 
     #canvas-wrapper { transform-origin: top left; transition: transform 0.2s ease-out; display: inline-block; pointer-events: none; }
     #canvas-container { background-color: var(--bg-canvas); background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px); background-size: 50px 50px; position: relative; box-shadow: 0 10px 50px rgba(0,0,0,0.8); border: 1px solid #333; overflow: visible; pointer-events: auto; }
@@ -57,6 +59,7 @@
 
     .patch-bg { background-color: #111; border: 1px solid #333; padding: 2px 6px; border-radius: 4px; box-shadow: 0 0 10px rgba(0,0,0,0.9); }
 
+    /* HARDWARE VISUALS OP PIXEL SCHAAL */
     .stack-ladder { position: absolute; width: 16px; left: calc(50% - 8px); bottom: 0; background-image: repeating-linear-gradient(0deg, transparent, transparent 18px, #1a1a1a 18px, #1a1a1a 22px); border-left: 2px solid #555; border-right: 2px solid #555; z-index: 0; pointer-events: none; opacity: 0.95; display: none; box-shadow: inset 1px 0 0 rgba(255,255,255,0.1), inset -1px 0 0 rgba(0,0,0,0.5); }
     .stack-base { position: absolute; width: calc(100% + 4px); height: 16px; bottom: -16px; left: -2px; background: linear-gradient(180deg, #555, #222); border: 1px solid #000; z-index: 6; pointer-events: none; box-shadow: 0 5px 10px rgba(0,0,0,0.8); border-radius: 2px; display: none; }
     .stack-foot { position: absolute; width: 16px; height: 6px; bottom: -22px; left: calc(50% - 8px); background: #111; border-radius: 4px; border-bottom: 2px solid #000; z-index: 5; pointer-events: none; display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
@@ -65,6 +68,7 @@
     .stack-fliepel { position: absolute; width: 20px; height: 10px; left: calc(50% - 10px); top: calc(50% - 5px); background: #0088ff; border: 1px solid #0055cc; border-top: 1px solid #33aaff; border-radius: 2px; z-index: 6; pointer-events: none; box-shadow: 0 2px 5px rgba(0,0,0,0.6); display: none; align-items: center; justify-content: space-between; padding: 0 2px; }
     .stack-fliepel::before, .stack-fliepel::after { content: ''; width: 4px; height: 4px; background: #222; border-radius: 50%; box-shadow: inset 1px 1px 1px #000, inset -1px -1px 1px #555; }
 
+    /* Normale Rigging Elementen */
     .rig-bar { position: absolute; height: 14px; top: -14px; background: linear-gradient(180deg, #444, #111); border: 1px solid #000; border-bottom: none; z-index: 5; box-shadow: 0 -3px 5px rgba(0,0,0,0.5); border-radius: 2px 2px 0 0; display: none; }
     .rig-shackle { position: absolute; width: 16px; height: 20px; top: -34px; border: 4px solid #aaa; border-radius: 50% 50% 10% 10%; z-index: 6; box-shadow: 0 2px 4px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.4); display: none; transition: 0.2s; pointer-events: none; }
     
@@ -168,10 +172,12 @@
   <div id="patch-instruction" class="patch-instruction"></div>
 
   <div id="sidebar-left">
-    <div class="panel-header">Pixelmap by MTR</div>
+    <div class="panel-header" style="display:flex; justify-content:space-between; align-items:center;">
+        <span>Pixelmap by MTR</span>
+        <span id="cloud-sync-indicator"></span>
+    </div>
     <div class="panel-content">
       
-      <!-- 1. CANVAS FORMAAT -->
       <details open>
         <summary>1. Canvas Formaat (Pixels)</summary>
         <div class="form-row">
@@ -180,7 +186,6 @@
         </div>
       </details>
 
-      <!-- 2. SCHERM PLAATSEN -->
       <details open style="border-color: var(--accent);">
         <summary>2. Scherm Plaatsen</summary>
         <div class="form-group"><label>Scherm Naam</label><input type="text" id="wall_name" placeholder="Optioneel..."></div>
@@ -199,7 +204,6 @@
         </div>
       </details>
 
-      <!-- 3. PROJECT INFORMATIE -->
       <details open>
         <summary>3. Project Informatie</summary>
         <div class="form-group"><label>Projectnaam</label><input type="text" id="pi_name" placeholder="Bijv. Mainstage Festival" onchange="saveAppCloudState()"></div>
@@ -210,7 +214,6 @@
         </div>
       </details>
 
-      <!-- 4. BIBLIOTHEEK -->
       <details id="details_lib">
         <summary>4. Bibliotheek</summary>
         <div class="form-row">
@@ -298,6 +301,9 @@
       </details>
 
     </div>
+    <div style="margin-top: auto; padding: 15px;">
+        <button class="danger" onclick="logout()">🔒 Uitloggen</button>
+    </div>
   </div>
 
   <div id="workspace">
@@ -370,12 +376,12 @@
   </div>
 
   <script>
-    // --- SUPABASE CLOUD SETUP V46 ---
+    // --- SUPABASE CLOUD SETUP V48 ---
     const supabaseUrl = 'https://gjpoebdsyvqtxyazwmxp.supabase.co';
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdqcG9lYmRzeXZxdHh5YXp3bXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjU0NjcsImV4cCI6MjEwMjA0MTQ2N30.9SHv-ce1-ytuVKvh1ylT8ZPyYj0FXsz7Lk8rgsjSMsA';
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
-    let isLoggedIn = sessionStorage.getItem('pixelmap_auth') === 'true';
+    let isLoggedIn = localStorage.getItem('pixelmap_auth') === 'true';
 
     let defaultLeds = [
         { id: 'roe_bp2', name: 'ROE BP2V2', physW: 500, physH: 500, pxW: 176, pxH: 176, watt: 160, kg: 8.5, hasAlt: false }, 
@@ -393,13 +399,18 @@
 
     window.checkLogin = function() {
         if(document.getElementById('pin-code').value === '666') {
-            sessionStorage.setItem('pixelmap_auth', 'true');
+            localStorage.setItem('pixelmap_auth', 'true');
             isLoggedIn = true;
             document.getElementById('login-overlay').style.display = 'none';
             initAppFromCloud();
         } else {
             document.getElementById('login-error').style.display = 'block';
         }
+    }
+
+    window.logout = function() {
+        localStorage.removeItem('pixelmap_auth');
+        location.reload();
     }
 
     async function initAppFromCloud() {
@@ -448,8 +459,13 @@
         }
     }
 
+    // Massieve Upsert Actie & Visuele Cloud Sync
     window.saveAppCloudState = async function() {
         if (!isLoggedIn) return;
+        
+        let syncInd = document.getElementById('cloud-sync-indicator');
+        if(syncInd) { syncInd.innerText = "☁️ Synchroniseren..."; syncInd.style.color = "var(--warning)"; }
+
         let projInfo = {
             name: document.getElementById('pi_name').value,
             loc: document.getElementById('pi_loc').value,
@@ -460,16 +476,24 @@
         };
         
         try {
-            const { error } = await Promise.all([
-                supabaseClient.from('pixelmap_app_state').update({ state_value: db.leds }).eq('state_key', 'leds'),
-                supabaseClient.from('pixelmap_app_state').update({ state_value: db.procs }).eq('state_key', 'procs'),
-                supabaseClient.from('pixelmap_app_state').update({ state_value: projectProcs }).eq('state_key', 'proj_procs'),
-                supabaseClient.from('pixelmap_app_state').update({ state_value: walls }).eq('state_key', 'walls'),
-                supabaseClient.from('pixelmap_app_state').update({ state_value: projInfo }).eq('state_key', 'project_info')
-            ]);
-            if(error && error.length > 0) throw error[0];
+            const { error } = await supabaseClient.from('pixelmap_app_state').upsert([
+                { state_key: 'leds', state_value: db.leds },
+                { state_key: 'procs', state_value: db.procs },
+                { state_key: 'proj_procs', state_value: projectProcs },
+                { state_key: 'walls', state_value: walls },
+                { state_key: 'project_info', state_value: projInfo }
+            ], { onConflict: 'state_key' });
+            
+            if(error) throw error;
+            
+            if(syncInd) { 
+                syncInd.innerText = "☁️ Opgeslagen"; 
+                syncInd.style.color = "var(--success)"; 
+                setTimeout(()=>syncInd.innerText="", 2000); 
+            }
         } catch(err) {
             console.error("Cloud sync mislukt:", err);
+            if(syncInd) { syncInd.innerText = "☁️ Fout bij opslaan!"; syncInd.style.color = "var(--danger)"; }
         }
     };
     // --- EINDE SUPABASE SETUP ---
@@ -668,13 +692,14 @@
       const wall = walls[activePatchWall];
       if (activePatchType === 'data') {
          let pIdx = parseInt(document.getElementById('draw-proc-sel').value); let port = parseInt(document.getElementById('draw-port-sel').value);
-         let pathObj = wall.customData.find(p => p.procIdx === pIdx && p.port === port); if (pathObj && pathObj.tiles.length > 0) { pathObj.tiles.pop(); renderCanvas(); }
+         let pathObj = wall.customData.find(p => p.procIdx === pIdx && p.port === port); if (pathObj && pathObj.tiles.length > 0) { pathObj.tiles.pop(); saveAppCloudState(); renderCanvas(); return; }
       } else if (activePatchType === 'power') {
          let grp = parseInt(document.getElementById('draw-group-sel').value);
-         let pathObj = wall.customPower.find(p => p.group === grp); if (pathObj && pathObj.tiles.length > 0) { pathObj.tiles.pop(); renderCanvas(); }
+         let pathObj = wall.customPower.find(p => p.group === grp); if (pathObj && pathObj.tiles.length > 0) { pathObj.tiles.pop(); saveAppCloudState(); renderCanvas(); return; }
       }
     };
 
+    // Engine: W, H, X, Y in Pixels op Canvas. Physics berekent via physW/physH
     function getWallPanels(wall) {
         let panels = [];
         for(let r=0; r<wall.rows; r++) {
@@ -1004,7 +1029,7 @@
                     let load = pointLoads[c].toFixed(1);
                     let lDiv = document.createElement('div');
                     lDiv.className = 'rig-weight-label ' + (load > 500 ? 'danger' : 'safe');
-                    lDiv.innerHTML = `${load} kg`;
+                    lDiv.innerHTML = `${load}<br>kg`;
                     lDiv.style.left = (col.x + (col.w / 2)) + 'px';
                     wDiv.appendChild(lDiv);
                 }
