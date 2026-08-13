@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pixelmap by MTR - V44 (Cloud Auth & Supabase)</title>
+  <title>Pixelmap by MTR - V45 (Menu Reorder & Cloud Sync)</title>
   
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -170,8 +170,38 @@
   <div id="sidebar-left">
     <div class="panel-header">Pixelmap by MTR</div>
     <div class="panel-content">
+      
+      <!-- 1. CANVAS FORMAAT (Standaard open) -->
       <details open>
-        <summary>1. Project Informatie</summary>
+        <summary>1. Canvas Formaat (Pixels)</summary>
+        <div class="form-row">
+          <div class="form-group"><label>Breedte (px)</label><input type="number" id="canW" value="3840" onchange="updateCanvasSize(); saveAppCloudState();"></div>
+          <div class="form-group"><label>Hoogte (px)</label><input type="number" id="canH" value="2160" onchange="updateCanvasSize(); saveAppCloudState();"></div>
+        </div>
+      </details>
+
+      <!-- 2. SCHERM PLAATSEN (Standaard open) -->
+      <details open style="border-color: var(--accent);">
+        <summary>2. Scherm Plaatsen</summary>
+        <div class="form-group"><label>Scherm Naam</label><input type="text" id="wall_name" placeholder="Optioneel..."></div>
+        <div class="form-group"><label>LED Type (Basis Formaat)</label><select id="wall_led"></select></div>
+        <div class="form-row">
+          <div class="form-group"><label>Panelen B</label><input type="number" id="wall_cols" value="4"></div>
+          <div class="form-group"><label>Panelen H</label><input type="number" id="wall_rows" value="3"></div>
+        </div>
+        <div class="form-row">
+          <div class="form-group"><label>X Positie</label><input type="number" id="wall_x" value="0"></div>
+          <div class="form-group"><label>Y Positie</label><input type="number" id="wall_y" value="0"></div>
+        </div>
+        <div style="display:flex; gap:10px;">
+          <button onclick="addWall()" id="btn_save_wall">Zet op Canvas</button>
+          <button class="outline" onclick="cancelWallEdit()" id="btn_cancel_wall" style="display:none;">Annuleren</button>
+        </div>
+      </details>
+
+      <!-- 3. PROJECT INFORMATIE (Standaard open) -->
+      <details open>
+        <summary>3. Project Informatie</summary>
         <div class="form-group"><label>Projectnaam</label><input type="text" id="pi_name" placeholder="Bijv. Mainstage Festival" onchange="saveAppCloudState()"></div>
         <div class="form-group"><label>Locatie</label><input type="text" id="pi_loc" placeholder="Locatie (Bijv. Ahoy)" onchange="saveAppCloudState()"></div>
         <div class="form-row">
@@ -180,16 +210,9 @@
         </div>
       </details>
 
-      <details>
-        <summary>2. Canvas Formaat (Pixels)</summary>
-        <div class="form-row">
-          <div class="form-group"><label>Breedte (px)</label><input type="number" id="canW" value="3840" onchange="updateCanvasSize(); saveAppCloudState();"></div>
-          <div class="form-group"><label>Hoogte (px)</label><input type="number" id="canH" value="2160" onchange="updateCanvasSize(); saveAppCloudState();"></div>
-        </div>
-      </details>
-
+      <!-- 4. BIBLIOTHEEK (Toevoegen en Beheren gecombineerd) -->
       <details id="details_lib">
-        <summary>3. Bibliotheek Toevoegen</summary>
+        <summary>4. Bibliotheek</summary>
         <div class="form-row">
           <select id="libTypeSwitcher" onchange="toggleLibForms()">
             <option value="led">Nieuw / Edit LED Paneel</option>
@@ -266,33 +289,14 @@
             <button class="outline" onclick="cancelProcEdit()" id="btn_cancel_proc" style="display:none;">Annuleren</button>
           </div>
         </div>
-      </details>
 
-      <details id="details_wall" open style="border-color: var(--accent);">
-        <summary>4. Scherm Plaatsen</summary>
-        <div class="form-group"><label>Scherm Naam</label><input type="text" id="wall_name" placeholder="Optioneel..."></div>
-        <div class="form-group"><label>LED Type (Basis Formaat)</label><select id="wall_led"></select></div>
-        <div class="form-row">
-          <div class="form-group"><label>Panelen B</label><input type="number" id="wall_cols" value="4"></div>
-          <div class="form-group"><label>Panelen H</label><input type="number" id="wall_rows" value="3"></div>
-        </div>
-        <div class="form-row">
-          <div class="form-group"><label>X Positie</label><input type="number" id="wall_x" value="0"></div>
-          <div class="form-group"><label>Y Positie</label><input type="number" id="wall_y" value="0"></div>
-        </div>
-        <div style="display:flex; gap:10px;">
-          <button onclick="addWall()" id="btn_save_wall">Zet op Canvas</button>
-          <button class="outline" onclick="cancelWallEdit()" id="btn_cancel_wall" style="display:none;">Annuleren</button>
-        </div>
-      </details>
-      
-      <details>
-        <summary>5. Bibliotheek Beheren</summary>
-        <h4 style="margin:0 0 5px 0; color:var(--text-muted); font-size: 10px; text-transform:uppercase;">LED Panelen</h4>
+        <hr style="border:0; border-top:1px solid var(--border); margin:15px 0;">
+        <h4 style="margin:0 0 5px 0; color:var(--text-muted); font-size: 10px; text-transform:uppercase;">Bestaande LED Panelen</h4>
         <div id="manage_leds" style="margin-bottom: 15px;"></div>
-        <h4 style="margin:0 0 5px 0; color:var(--text-muted); font-size: 10px; text-transform:uppercase;">Processoren</h4>
+        <h4 style="margin:0 0 5px 0; color:var(--text-muted); font-size: 10px; text-transform:uppercase;">Bestaande Processoren</h4>
         <div id="manage_procs"></div>
       </details>
+
     </div>
   </div>
 
@@ -382,7 +386,6 @@
     let projectProcs = [];
     let walls = [];
 
-    // Verberg auth check if already logged in
     if(isLoggedIn) {
         document.getElementById('login-overlay').style.display = 'none';
         initAppFromCloud();
@@ -410,7 +413,6 @@
                     if (row.state_key === 'procs') db.procs = row.state_value || [];
                     if (row.state_key === 'proj_procs') projectProcs = row.state_value || [];
                     if (row.state_key === 'walls') {
-                        // Restore class logic if needed
                         walls = row.state_value.map(w => {
                             w.splitTiles = w.splitTiles || [];
                             w.mount = w.mount || 'hang';
@@ -430,7 +432,6 @@
                 });
             }
             
-            // Zorg dat er altijd 1 processor is
             if (projectProcs.length === 0 && db.procs.length > 0) { 
                 projectProcs.push({ id: 'p_'+Date.now(), dbId: db.procs[0].id }); 
                 saveAppCloudState(); 
@@ -443,11 +444,10 @@
             renderCanvas();
         } catch(err) {
             console.error("Supabase laadfout:", err);
-            alert("Let op: kon data niet inladen vanuit de cloud. Controleer database tabel setup.");
+            alert("Let op: kon data niet inladen vanuit de cloud.");
         }
     }
 
-    // Centrale opslag functie naar Supabase
     window.saveAppCloudState = async function() {
         if (!isLoggedIn) return;
         let projInfo = {
@@ -468,7 +468,7 @@
                 supabaseClient.from('pixelmap_app_state').update({ state_value: projInfo }).eq('state_key', 'project_info')
             ]);
         } catch(err) {
-            console.error("Oeps, cloud sync mislukt:", err);
+            console.error("Cloud sync mislukt:", err);
         }
     };
     // --- EINDE SUPABASE SETUP ---
@@ -551,130 +551,6 @@
         return portNum;
     }
 
-    function toggleLibForms() { document.getElementById('form-led').style.display = document.getElementById('libTypeSwitcher').value === 'led' ? 'block' : 'none'; document.getElementById('form-proc').style.display = document.getElementById('libTypeSwitcher').value === 'proc' ? 'block' : 'none'; }
-    window.updateCanvasSize = function() { document.getElementById('canvas-container').style.width = document.getElementById('canW').value + 'px'; document.getElementById('canvas-container').style.height = document.getElementById('canH').value + 'px'; document.getElementById('canvas-size-label').innerText = `${document.getElementById('canW').value} X ${document.getElementById('canH').value} PX`; renderCanvas(); };
-    window.applyZoom = function(val) { document.getElementById('canvas-wrapper').style.transform = `scale(${val})`; };
-    
-    function refreshDropdowns() {
-      document.getElementById('wall_led').innerHTML = ''; db.leds.forEach(l => document.getElementById('wall_led').innerHTML += `<option value="${l.id}">${l.name} (${l.physW}x${l.physH}mm, ${l.pxW}x${l.pxH}px)</option>`);
-      document.getElementById('add_project_proc_sel').innerHTML = ''; db.procs.forEach(p => document.getElementById('add_project_proc_sel').innerHTML += `<option value="${p.id}">${p.name}</option>`);
-      document.getElementById('manage_leds').innerHTML = ''; 
-      db.leds.forEach(l => { document.getElementById('manage_leds').innerHTML += `<div class="lib-item"><span>${l.name}</span> <div><button onclick="editLed('${l.id}')" style="background:var(--accent); margin-right:5px; padding:2px 6px; border:none; color:white; border-radius:3px; cursor:pointer;">✏️</button><button onclick="deleteLed('${l.id}')">X</button></div></div>`; });
-      document.getElementById('manage_procs').innerHTML = ''; 
-      db.procs.forEach(p => { document.getElementById('manage_procs').innerHTML += `<div class="lib-item"><span>${p.name}</span> <div><button onclick="editProc('${p.id}')" style="background:var(--accent); margin-right:5px; padding:2px 6px; border:none; color:white; border-radius:3px; cursor:pointer;">✏️</button><button onclick="deleteProc('${p.id}')">X</button></div></div>`; });
-    }
-
-    window.editLed = function(id) {
-        const led = db.leds.find(l => l.id === id); if(!led) return; editingLedId = id; document.getElementById('details_lib').open = true; document.getElementById('libTypeSwitcher').value = 'led'; toggleLibForms();
-        document.getElementById('nl_name').value = led.name; document.getElementById('nl_physW').value = led.physW; document.getElementById('nl_physH').value = led.physH; document.getElementById('nl_pxW').value = led.pxW; document.getElementById('nl_pxH').value = led.pxH; document.getElementById('nl_watt').value = led.watt; document.getElementById('nl_kg').value = led.kg; document.getElementById('nl_has_alt').checked = led.hasAlt; document.getElementById('form-led-alt').style.display = led.hasAlt ? 'block' : 'none';
-        if(led.hasAlt) { document.getElementById('nla_physW').value = led.altPhysW; document.getElementById('nla_physH').value = led.altPhysH; document.getElementById('nla_pxW').value = led.altPxW; document.getElementById('nla_pxH').value = led.altPxH; document.getElementById('nla_watt').value = led.altWatt; document.getElementById('nla_kg').value = led.altKg; }
-        document.getElementById('btn_save_led').innerText = 'Update Paneel'; document.getElementById('btn_cancel_led').style.display = 'block'; document.getElementById('nl_name').scrollIntoView();
-    };
-    window.cancelLedEdit = function() { editingLedId = null; document.getElementById('nl_name').value = ''; document.getElementById('btn_save_led').innerText = 'Toevoegen'; document.getElementById('btn_cancel_led').style.display = 'none'; };
-
-    window.editProc = function(id) {
-        const proc = db.procs.find(p => p.id === id); if(!proc) return; editingProcId = id; document.getElementById('details_lib').open = true; document.getElementById('libTypeSwitcher').value = 'proc'; toggleLibForms();
-        document.getElementById('np_name').value = proc.name; document.getElementById('np_px').value = proc.px; document.getElementById('np_type').value = proc.isFiber ? 'fiber' : 'rj45'; document.getElementById('np_fib_opt').style.display = proc.isFiber ? 'flex' : 'none'; document.getElementById('np_rj_opt').style.display = proc.isFiber ? 'none' : 'flex';
-        if (proc.isFiber) { document.getElementById('np_fibers').value = proc.fibers; document.getElementById('np_ports_per_fiber').value = proc.portsPerFiber; } else { document.getElementById('np_ports').value = proc.ports; }
-        document.getElementById('btn_save_proc').innerText = 'Update Processor'; document.getElementById('btn_cancel_proc').style.display = 'block'; document.getElementById('np_name').scrollIntoView();
-    };
-    window.cancelProcEdit = function() { editingProcId = null; document.getElementById('np_name').value = ''; document.getElementById('btn_save_proc').innerText = 'Toevoegen'; document.getElementById('btn_cancel_proc').style.display = 'none'; };
-
-    window.editWall = function(index) {
-        const wall = walls[index]; editingWallIndex = index; document.getElementById('details_wall').open = true;
-        document.getElementById('wall_name').value = wall.id; document.getElementById('wall_led').value = wall.led.id; document.getElementById('wall_cols').value = wall.cols; document.getElementById('wall_rows').value = wall.rows; document.getElementById('wall_x').value = wall.x; document.getElementById('wall_y').value = wall.y;
-        document.getElementById('btn_save_wall').innerText = 'Update Scherm'; document.getElementById('btn_cancel_wall').style.display = 'block'; document.getElementById('wall_name').scrollIntoView();
-    };
-    window.cancelWallEdit = function() { editingWallIndex = null; document.getElementById('wall_name').value = ''; document.getElementById('btn_save_wall').innerText = 'Zet op Canvas'; document.getElementById('btn_cancel_wall').style.display = 'none'; };
-
-    window.addProjectProc = function() { const dbId = document.getElementById('add_project_proc_sel').value; if (!dbId) return; projectProcs.push({ id: 'p_'+Date.now(), dbId: dbId }); saveAppCloudState(); renderCanvas(); };
-    window.removeProjectProc = function(idx) { if (projectProcs.length <= 1) return alert("Houd minimaal 1 processor in je project."); projectProcs.splice(idx, 1); saveAppCloudState(); renderCanvas(); };
-
-    window.saveNewLed = function() { 
-        const hasAlt = document.getElementById('nl_has_alt').checked;
-        const led = { 
-            id: editingLedId ? editingLedId : 'led_' + Date.now(), name: document.getElementById('nl_name').value, 
-            physW: parseInt(document.getElementById('nl_physW').value), physH: parseInt(document.getElementById('nl_physH').value), 
-            pxW: parseInt(document.getElementById('nl_pxW').value), pxH: parseInt(document.getElementById('nl_pxH').value), 
-            watt: parseInt(document.getElementById('nl_watt').value), kg: parseFloat(document.getElementById('nl_kg').value),
-            hasAlt: hasAlt, 
-            altPhysW: hasAlt ? parseInt(document.getElementById('nla_physW').value) : 0, altPhysH: hasAlt ? parseInt(document.getElementById('nla_physH').value) : 0,
-            altPxW: hasAlt ? parseInt(document.getElementById('nla_pxW').value) : 0, altPxH: hasAlt ? parseInt(document.getElementById('nla_pxH').value) : 0,
-            altWatt: hasAlt ? parseInt(document.getElementById('nla_watt').value) : 0, altKg: hasAlt ? parseFloat(document.getElementById('nla_kg').value) : 0
-        }; 
-        if(!led.name) return; 
-        if (editingLedId) { let idx = db.leds.findIndex(l => l.id === editingLedId); if (idx > -1) db.leds[idx] = led; walls.forEach(w => { if(w.led.id === led.id) w.led = led; }); } else { db.leds.push(led); }
-        refreshDropdowns(); cancelLedEdit(); saveAppCloudState(); renderCanvas();
-    };
-    
-    window.saveNewProcessor = function() { 
-        const isFib = document.getElementById('np_type').value === 'fiber';
-        const proc = { 
-            id: editingProcId ? editingProcId : 'proc_' + Date.now(), name: document.getElementById('np_name').value, px: parseInt(document.getElementById('np_px').value), 
-            isFiber: isFib, ports: isFib ? (parseInt(document.getElementById('np_fibers').value) * parseInt(document.getElementById('np_ports_per_fiber').value)) : parseInt(document.getElementById('np_ports').value), fibers: isFib ? parseInt(document.getElementById('np_fibers').value) : 1, portsPerFiber: isFib ? parseInt(document.getElementById('np_ports_per_fiber').value) : parseInt(document.getElementById('np_ports').value) 
-        }; 
-        if(!proc.name) return; 
-        if (editingProcId) { let idx = db.procs.findIndex(p => p.id === editingProcId); if (idx > -1) db.procs[idx] = proc; } else { db.procs.push(proc); }
-        refreshDropdowns(); cancelProcEdit(); saveAppCloudState(); renderCanvas();
-    };
-
-    window.deleteLed = function(id) { if(confirm("Definitief verwijderen?")) { db.leds = db.leds.filter(l => l.id !== id); refreshDropdowns(); saveAppCloudState(); } };
-    window.deleteProc = function(id) { if(confirm("Definitief verwijderen?")) { db.procs = db.procs.filter(p => p.id !== id); refreshDropdowns(); saveAppCloudState(); renderCanvas(); } };
-
-    window.addWall = function() {
-      const led = db.leds.find(l => l.id === document.getElementById('wall_led').value); if(!led) return alert("Selecteer eerst een LED paneel!");
-      let wName = document.getElementById('wall_name').value.trim(); let cols = parseInt(document.getElementById('wall_cols').value); let rows = parseInt(document.getElementById('wall_rows').value); let xPos = parseInt(document.getElementById('wall_x').value); let yPos = parseInt(document.getElementById('wall_y').value);
-
-      if (editingWallIndex !== null) {
-          let wall = walls[editingWallIndex]; let dimChanged = (wall.led.id !== led.id || wall.cols !== cols || wall.rows !== rows);
-          wall.id = wName !== "" ? wName : 'Scherm ' + (editingWallIndex + 1); wall.led = led; wall.cols = cols; wall.rows = rows; wall.x = xPos; wall.y = yPos;
-          if (dimChanged) { wall.customData = []; wall.customPower = []; wall.splitTiles = []; wall.stack = {ladders_1m:[], ladders_05m:[], bases:[], fliepels:[]}; wall.activeHangPoints = Array.from({length: cols}, (_, i) => i); alert("Let op: Omdat de afmetingen of het LED-type zijn gewijzigd, is de patch-data en het frame voor dit scherm gereset."); }
-          cancelWallEdit();
-      } else {
-          walls.push({ 
-              id: wName !== "" ? wName : 'Scherm ' + (walls.length + 1), 
-              led: led, dataMode: 'H', powerMode: 'AUTO', mount: 'hang', 
-              stack: {ladders_1m:[], ladders_05m:[], bases:[], fliepels:[]}, activeHangPoints: Array.from({length: cols}, (_, i) => i),
-              customData: [], customPower: [], splitTiles: [], cols: cols, rows: rows, x: xPos, y: yPos 
-          });
-          document.getElementById('wall_name').value = ''; 
-      }
-      saveAppCloudState();
-      renderCanvas();
-    };
-
-    window.removeWall = function(index) { if(activePatchWall === index) activePatchWall = null; walls.splice(index, 1); saveAppCloudState(); renderCanvas(); };
-    window.renameWall = function(index) { const newName = prompt("Nieuwe naam:", walls[index].id); if (newName && newName.trim() !== "") { walls[index].id = newName.trim(); saveAppCloudState(); renderCanvas(); } };
-    
-    window.setDataMode = function(wIndex, mode) { walls[wIndex].dataMode = mode; if (mode === 'M') { activePatchWall = wIndex; activePatchType = 'data'; document.getElementById('cableViewMode').value = 'both'; } else { if(activePatchWall === wIndex) { activePatchWall = null; activePatchType = null; } saveAppCloudState(); } renderCanvas(); };
-    window.setPowerMode = function(wIndex, mode) { walls[wIndex].powerMode = mode; if (mode === 'M') { activePatchWall = wIndex; activePatchType = 'power'; document.getElementById('cableViewMode').value = 'both'; } else { if(activePatchWall === wIndex) { activePatchWall = null; activePatchType = null; } saveAppCloudState(); } renderCanvas(); };
-    window.setLayoutMode = function(wIndex) { activePatchWall = wIndex; activePatchType = 'layout'; document.getElementById('cableViewMode').value = 'both'; renderCanvas(); };
-    window.setMountMode = function(wIndex, mode) { walls[wIndex].mount = mode; saveAppCloudState(); renderCanvas(); };
-    window.setStackMode = function(wIndex) { activePatchWall = wIndex; activePatchType = 'stackframe'; activeStackTool = 'base'; document.getElementById('cableViewMode').value = 'hardware'; renderCanvas(); };
-    window.setRiggingMode = function(wIndex) { activePatchWall = wIndex; activePatchType = 'rigging'; document.getElementById('cableViewMode').value = 'hardware'; renderCanvas(); };
-    window.stopManualPatch = function() { activePatchWall = null; activePatchType = null; document.getElementById('cableViewMode').value = 'both'; saveAppCloudState(); renderCanvas(); };
-    
-    window.handleBannerProcChange = function() { renderCanvas(); };
-    window.handleBannerPortChange = function() { renderCanvas(); };
-    
-    window.forceNewCable = function() {
-        if (activePatchType === 'data') { let sel = document.getElementById('draw-port-sel'); if (sel && sel.selectedIndex < sel.options.length - 1) { sel.selectedIndex++; renderCanvas(); } } 
-        else if (activePatchType === 'power') { let sel = document.getElementById('draw-group-sel'); if (sel) { sel.value = parseInt(sel.value) + 1; renderCanvas(); } }
-    };
-
-    window.undoPatch = function() {
-      if (activePatchWall === null || activePatchType === null) return;
-      const wall = walls[activePatchWall];
-      if (activePatchType === 'data') {
-         let pIdx = parseInt(document.getElementById('draw-proc-sel').value); let port = parseInt(document.getElementById('draw-port-sel').value);
-         let pathObj = wall.customData.find(p => p.procIdx === pIdx && p.port === port); if (pathObj && pathObj.tiles.length > 0) { pathObj.tiles.pop(); renderCanvas(); }
-      } else if (activePatchType === 'power') {
-         let grp = parseInt(document.getElementById('draw-group-sel').value);
-         let pathObj = wall.customPower.find(p => p.group === grp); if (pathObj && pathObj.tiles.length > 0) { pathObj.tiles.pop(); renderCanvas(); }
-      }
-    };
-
-    // Engine: W, H, X, Y in Pixels op Canvas. Physics berekent via physW/physH
     function getWallPanels(wall) {
         let panels = [];
         for(let r=0; r<wall.rows; r++) {
@@ -704,6 +580,7 @@
           wall.stack = { ladders_1m: [], ladders_05m: [], bases: [], fliepels: [] };
           wall.customData.forEach(p => p.tiles = p.tiles.filter(t => t !== panelId));
           wall.customPower.forEach(p => p.tiles = p.tiles.filter(t => t !== panelId));
+          saveAppCloudState();
           renderCanvas(); return;
       }
       
@@ -794,6 +671,7 @@
           }
           
           if(!isPatchDragging) window.patchDrawAction = doAdd ? 'add' : 'remove';
+          saveAppCloudState();
           renderCanvas(); return;
       }
 
@@ -802,7 +680,7 @@
           let pathObj = wall.customData.find(p => p.procIdx === pIdx && p.port === port); if (!pathObj) { pathObj = { procIdx: pIdx, port: port, tiles: [] }; wall.customData.push(pathObj); }
           if (pathObj.tiles.length > 0) { 
               let lastId = pathObj.tiles[pathObj.tiles.length - 1]; 
-              if (lastId === panelId) { pathObj.tiles.pop(); renderCanvas(); return; } 
+              if (lastId === panelId) { pathObj.tiles.pop(); saveAppCloudState(); renderCanvas(); return; } 
               let lastPanel = panels.find(p => p.id === lastId);
               if (lastPanel && lastPanel.type !== clickedPanel.type) {
                   const banner = document.getElementById('patch-instruction'); let oldBg = banner.style.backgroundColor; banner.style.backgroundColor = 'var(--danger)'; setTimeout(() => banner.style.backgroundColor = oldBg, 300); return; 
@@ -812,9 +690,10 @@
       } else if (activePatchType === 'power') {
           let grp = parseInt(document.getElementById('draw-group-sel').value);
           let pathObj = wall.customPower.find(p => p.group === grp); if (!pathObj) { pathObj = { group: grp, tiles: [] }; wall.customPower.push(pathObj); }
-          if (pathObj.tiles.length > 0) { let lastId = pathObj.tiles[pathObj.tiles.length - 1]; if (lastId === panelId) { pathObj.tiles.pop(); renderCanvas(); return; } }
+          if (pathObj.tiles.length > 0) { let lastId = pathObj.tiles[pathObj.tiles.length - 1]; if (lastId === panelId) { pathObj.tiles.pop(); saveAppCloudState(); renderCanvas(); return; } }
           wall.customPower.forEach(p => { p.tiles = p.tiles.filter(t => t !== panelId); }); pathObj.tiles.push(panelId);
       }
+      saveAppCloudState();
       renderCanvas();
     };
 
@@ -993,7 +872,7 @@
                 let sDiv = document.createElement('div'); sDiv.className = 'rig-shackle'; sDiv.style.left = shackleX + 'px';
                 if(isDrawing && activePatchType === 'rigging') {
                     sDiv.style.borderColor = isActive ? 'var(--success)' : '#444'; sDiv.style.opacity = isActive ? '1' : '0.4'; sDiv.style.pointerEvents = 'auto'; sDiv.style.cursor = 'pointer';
-                    sDiv.onmousedown = (e) => { e.stopPropagation(); if(isActive) wall.activeHangPoints = wall.activeHangPoints.filter(id => id !== c); else wall.activeHangPoints.push(c); renderCanvas(); };
+                    sDiv.onmousedown = (e) => { e.stopPropagation(); if(isActive) wall.activeHangPoints = wall.activeHangPoints.filter(id => id !== c); else wall.activeHangPoints.push(c); saveAppCloudState(); renderCanvas(); };
                 } else { sDiv.style.borderColor = isActive ? '#aaa' : '#333'; sDiv.style.opacity = isActive ? '1' : '0.1'; sDiv.style.pointerEvents = 'none'; }
                 wDiv.appendChild(sDiv);
 
@@ -1001,7 +880,7 @@
                     let load = pointLoads[c].toFixed(1);
                     let lDiv = document.createElement('div');
                     lDiv.className = 'rig-weight-label ' + (load > 500 ? 'danger' : 'safe');
-                    lDiv.innerHTML = `${load}<br>kg`;
+                    lDiv.innerHTML = `${load} kg`;
                     lDiv.style.left = (col.x + (col.w / 2)) + 'px';
                     wDiv.appendChild(lDiv);
                 }
@@ -1333,7 +1212,7 @@
                   </div>
               </div>
               <div><button onclick="stopManualPatch()" style="background:#fff; color:#000; border:none; padding:8px 16px; border-radius:4px; font-weight:bold; cursor:pointer; font-size:14px;">✅ Klaar met Bouwen</button></div>
-            </div>`;
+            `;
         } else if (activePatchType === 'layout') {
             banner.className = 'patch-instruction layout';
             banner.innerHTML = `<strong>📐 Wissel Formaat Modus (${wall.id})</strong><br><span style="font-size:12px;">Klik op tegels om ze in Alt-formaat te veranderen!</span><br><button onclick="stopManualPatch()" style="background:#fff; color:#000; border:none; padding:4px 12px; border-radius:4px; font-weight:bold; cursor:pointer; font-size:11px; margin-top:5px;">✅ Klaar met Bouwen</button>`;
@@ -1371,7 +1250,6 @@
         }
       } else { banner.style.display = 'none'; }
 
-      // Sync bomTotals with calculated totals
       bomTotals.px = calcData.px;
       bomTotals.kg = calcData.kg;
       bomTotals.watt = calcData.watt;
@@ -1472,8 +1350,6 @@
                 
                 container.classList.add('export-hw-only');
                 let hwTitle = wall.mount === 'stack' ? `Stackframe Hardware - ${wall.id}` : `Rigging Hardware - ${wall.id}`;
-                
-                // ZORGT ERVOOR DAT DE HARDWARE (EN LABELS) NOOIT WORDEN AFGESNEDEN!
                 await addPageToPDF(hwTitle, true, cX, cY - 150, cW, cH + 150);
                 container.classList.remove('export-hw-only');
             }
