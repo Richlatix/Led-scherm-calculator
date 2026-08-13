@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>LED Pixelmap Pro - V3</title>
+  <title>LED Pixelmap Pro - V3.1</title>
   <style>
     :root {
       --bg-app: #0f0f11;
       --bg-panel: #1c1c21;
-      --bg-canvas: #25262b;
+      --bg-canvas: #1e1e24; /* Iets lichtere achtergrond voor het canvas */
       --accent: #007acc;
       --accent-hover: #005f9e;
       --text: #e0e0e0;
@@ -23,14 +23,38 @@
     * { box-sizing: border-box; }
     body, html { margin: 0; padding: 0; height: 100%; font-family: 'Segoe UI', Tahoma, sans-serif; background: var(--bg-app); color: var(--text); overflow: hidden; display: flex; }
 
-    /* LAYOUT */
-    #sidebar-left, #sidebar-right { width: 320px; background: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 10; }
+    /* LAYOUT ZIJBALKEN */
+    #sidebar-left, #sidebar-right { width: 340px; background: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 10; flex-shrink: 0; }
     #sidebar-right { border-right: none; border-left: 1px solid var(--border); }
     .panel-header { padding: 15px; background: #151518; border-bottom: 1px solid var(--border); font-weight: bold; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; }
-    .panel-content { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 15px; }
+    .panel-content { flex: 1; overflow-y: auto; padding: 15px; display: flex; flex-direction: column; gap: 10px; }
 
-    #workspace { flex: 1; position: relative; overflow: auto; display: flex; align-items: center; justify-content: center; background: var(--bg-app); }
+    /* WORKSPACE & CANVAS */
+    #workspace { flex: 1; position: relative; overflow: auto; background: var(--bg-app); padding: 40px; }
+    
+    #canvas-wrapper {
+      transform-origin: top left; 
+      transition: transform 0.2s; 
+      display: inline-block; /* Zorgt dat de wrapper strak om het canvas valt */
+    }
 
+    #canvas-container { 
+      background-color: var(--bg-canvas); 
+      background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+      background-size: 50px 50px; 
+      position: relative; /* Belangrijk: geen absolute meer! Zorgt voor werkende scrollbars */
+      box-shadow: 0 0 40px rgba(0,0,0,0.8);
+      border: 1px solid #444;
+      overflow: hidden;
+    }
+    
+    .led-wall { position: absolute; display: grid; outline: 2px solid var(--accent); box-shadow: 0 0 15px rgba(0, 122, 204, 0.4); }
+    .led-panel { border: 1px solid rgba(0,0,0,0.8); background: rgba(255, 255, 255, 0.1); display: flex; align-items: center; justify-content: center; font-size: 10px; color: #aaa; text-align: center; }
+    
+    /* SVG VOOR KABELS */
+    #cable-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }
+    .data-cable { stroke: var(--success); stroke-width: 3; fill: none; stroke-dasharray: 5,5; opacity: 0.8; }
+    
     /* UI ELEMENTEN */
     h3 { margin: 0 0 10px 0; font-size: 14px; color: var(--accent); }
     .form-group { margin-bottom: 10px; }
@@ -42,28 +66,18 @@
     button:hover { background: var(--accent-hover); }
     button.outline { background: transparent; border: 1px solid var(--accent); color: var(--accent); }
     button.outline:hover { background: rgba(0, 122, 204, 0.1); }
+    button.danger { background: var(--danger); }
+    button.danger:hover { background: #992600; }
 
-    .card { background: #121214; border: 1px solid var(--border); padding: 10px; border-radius: 4px; margin-bottom: 10px; }
-    .card-title { font-weight: bold; margin-bottom: 5px; font-size: 13px; }
+    .card { background: #121214; border: 1px solid var(--border); padding: 10px; border-radius: 4px; margin-bottom: 5px; }
     .card-stat { font-size: 12px; color: var(--text-muted); display: flex; justify-content: space-between; margin-bottom: 2px; }
+    
+    /* ACCORDION (Details) */
+    details { background: #1a1a1f; border: 1px solid var(--border); border-radius: 4px; padding: 10px; margin-bottom: 10px; }
+    summary { font-weight: bold; font-size: 13px; cursor: pointer; outline: none; margin: -10px; padding: 10px; color: var(--accent); }
+    details[open] summary { border-bottom: 1px solid var(--border); margin-bottom: 15px; }
 
-    /* CANVAS & LEDS */
-    #canvas-container { 
-      background-color: var(--bg-canvas); 
-      background-image: linear-gradient(var(--grid-line) 1px, transparent 1px), linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
-      background-size: 50px 50px; 
-      position: absolute; transform-origin: top left; box-shadow: 0 0 50px rgba(0,0,0,0.5);
-    }
-    
-    .led-wall { position: absolute; display: grid; outline: 2px solid var(--accent); box-shadow: 0 0 15px rgba(0, 122, 204, 0.3); }
-    .led-panel { border: 1px solid #000; background: rgba(255, 255, 255, 0.05); display: flex; align-items: center; justify-content: center; font-size: 10px; color: #555; position: relative; }
-    
-    /* SVG VOOR KABELS */
-    #cable-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 5; }
-    .data-cable { stroke: var(--success); stroke-width: 3; fill: none; stroke-dasharray: 5,5; opacity: 0.7; }
-    .power-cable { stroke: var(--danger); stroke-width: 4; fill: none; opacity: 0.5; }
-    
-    #zoom-controls { position: fixed; bottom: 20px; left: 340px; background: var(--bg-panel); padding: 10px 15px; border-radius: 20px; border: 1px solid var(--border); display: flex; align-items: center; gap: 10px; z-index: 20; }
+    #zoom-controls { position: fixed; bottom: 20px; left: 360px; background: var(--bg-panel); padding: 10px 15px; border-radius: 20px; border: 1px solid var(--border); display: flex; align-items: center; gap: 10px; z-index: 20; box-shadow: 0 5px 15px rgba(0,0,0,0.5); }
   </style>
 </head>
 <body>
@@ -74,22 +88,22 @@
     <div class="panel-content">
       
       <!-- Canvas Instellingen -->
-      <div class="card">
-        <h3>1. Canvas Resolutie</h3>
+      <details open>
+        <summary>1. Canvas Resolutie</summary>
         <div class="form-row">
-          <div class="form-group"><label>Breedte</label><input type="number" id="canW" value="3840"></div>
-          <div class="form-group"><label>Hoogte</label><input type="number" id="canH" value="2160"></div>
+          <div class="form-group"><label>Breedte (px)</label><input type="number" id="canW" value="3840"></div>
+          <div class="form-group"><label>Hoogte (px)</label><input type="number" id="canH" value="2160"></div>
         </div>
-        <button class="outline" onclick="updateCanvasSize()">Toepassen</button>
-      </div>
+        <button class="outline" onclick="updateCanvasSize()">Pas Resolutie Toe</button>
+      </details>
 
-      <!-- Bibliotheek Beheer -->
-      <div class="card">
-        <h3>2. Bibliotheek Toevoegen</h3>
+      <!-- Bibliotheek Beheer (Nu Uitklapbaar!) -->
+      <details>
+        <summary>2. Bibliotheek Toevoegen</summary>
         <div class="form-row">
           <select id="libTypeSwitcher" onchange="toggleLibForms()">
-            <option value="led">Nieuw LED Paneel</option>
-            <option value="proc">Nieuwe Processor</option>
+            <option value="led">Nieuw LED Paneel Toevoegen</option>
+            <option value="proc">Nieuwe Processor Toevoegen</option>
           </select>
         </div>
         
@@ -109,39 +123,48 @@
         <div id="form-proc" style="display:none;">
           <input type="text" id="np_name" placeholder="Naam (bijv. MX2000)" class="form-group">
           <div class="form-row">
-            <div class="form-group"><label>Max Px/Poort</label><input type="number" id="np_px" value="650000"></div>
+            <div class="form-group"><label>Max Px / Poort</label><input type="number" id="np_px" value="650000"></div>
             <div class="form-group"><label>Aantal Poorten</label><input type="number" id="np_ports" value="20"></div>
           </div>
           <button class="outline" onclick="saveNewProcessor()">Opslaan in Bieb</button>
         </div>
-      </div>
+      </details>
 
       <!-- Scherm Bouwen -->
-      <div class="card" style="border-color: var(--accent);">
-        <h3>3. Scherm Plaatsen</h3>
+      <details open style="border-color: var(--accent);">
+        <summary>3. Scherm Plaatsen</summary>
+        
         <div class="form-group">
-          <label>LED Type</label>
+          <label>Scherm Naam (Optioneel)</label>
+          <input type="text" id="wall_name" placeholder="Bijv. Main Stage, DJ Booth...">
+        </div>
+
+        <div class="form-group">
+          <label>LED Type (Kies uit bieb)</label>
           <select id="wall_led"></select>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>Kolommen</label><input type="number" id="wall_cols" value="4"></div>
-          <div class="form-group"><label>Rijen</label><input type="number" id="wall_rows" value="3"></div>
+          <div class="form-group"><label>Panelen Breed</label><input type="number" id="wall_cols" value="4"></div>
+          <div class="form-group"><label>Panelen Hoog</label><input type="number" id="wall_rows" value="3"></div>
         </div>
         <div class="form-row">
-          <div class="form-group"><label>Positie X</label><input type="number" id="wall_x" value="100"></div>
-          <div class="form-group"><label>Positie Y</label><input type="number" id="wall_y" value="100"></div>
+          <div class="form-group"><label>X Positie</label><input type="number" id="wall_x" value="100"></div>
+          <div class="form-group"><label>Y Positie</label><input type="number" id="wall_y" value="100"></div>
         </div>
         <button onclick="addWall()">Zet op Canvas</button>
-      </div>
+      </details>
 
     </div>
   </div>
 
   <!-- MIDDEN: WORKSPACE -->
   <div id="workspace">
-    <div id="canvas-container">
-      <svg id="cable-layer"></svg>
-      <!-- HTML Muren komen hier -->
+    <!-- Wrapper zorgt dat inzoomen netjes werkt zonder de scroll te breken -->
+    <div id="canvas-wrapper">
+      <div id="canvas-container">
+        <svg id="cable-layer"></svg>
+        <!-- HTML Muren komen hier -->
+      </div>
     </div>
     
     <div id="zoom-controls">
@@ -159,7 +182,7 @@
       <div class="card">
         <h3>Algemene Setup</h3>
         <div class="form-group">
-          <label>Processor Setup</label>
+          <label>Processor Type</label>
           <select id="active_proc" onchange="calculateSchema()"></select>
         </div>
         <div class="form-group">
@@ -175,21 +198,22 @@
         <h3 style="color: var(--success);">Project Totalen</h3>
         <div class="card-stat"><span>Totaal Pixels:</span> <span id="tot_px">0</span></div>
         <div class="card-stat"><span>Totaal Gewicht:</span> <span id="tot_kg">0 kg</span></div>
-        <div class="card-stat"><span>Stroomverbruik (Max):</span> <span id="tot_w">0 W</span></div>
+        <div class="card-stat"><span>Stroom (Max):</span> <span id="tot_w">0 W</span></div>
         <hr style="border-color: var(--border); margin: 8px 0;">
-        <div class="card-stat"><strong style="color:white;">Benodigde Data Poorten:</strong> <span id="req_ports" style="font-weight:bold; color:white;">0</span></div>
-        <div class="card-stat"><strong style="color:white;">Benodigde Stroomgroepen:</strong> <span id="req_power" style="font-weight:bold; color:white;">0</span></div>
+        <div class="card-stat"><strong style="color:white;">Data Poorten:</strong> <span id="req_ports" style="font-weight:bold; color:white;">0</span></div>
+        <div class="card-stat"><strong style="color:white;">Stroomgroepen:</strong> <span id="req_power" style="font-weight:bold; color:white;">0</span></div>
       </div>
 
+      <h3 style="margin-top: 10px;">Lijst met Schermen</h3>
       <div id="wall-list-container">
-        <!-- Gegenereerde lijst met schermen -->
+        <!-- Gegenereerde lijst met schermen komt hier -->
       </div>
 
     </div>
   </div>
 
   <script>
-    // --- LOKALE DATABASE (Direct werkend in browser via LocalStorage) ---
+    // --- LOKALE DATABASE ---
     let db = {
       leds: JSON.parse(localStorage.getItem('pixelmap_leds')) || [
         { id: 'roe_bp2', name: 'ROE BP2V2', w: 176, h: 176, watt: 160, kg: 8.5 },
@@ -218,23 +242,23 @@
       document.getElementById('form-proc').style.display = type === 'proc' ? 'block' : 'none';
     }
 
-    function updateCanvasSize() {
+    window.updateCanvasSize = function() {
       const w = document.getElementById('canW').value;
       const h = document.getElementById('canH').value;
       const c = document.getElementById('canvas-container');
       c.style.width = w + 'px';
       c.style.height = h + 'px';
-    }
+    };
 
-    function applyZoom(val) {
-      document.getElementById('canvas-container').style.transform = `scale(${val})`;
-    }
+    window.applyZoom = function(val) {
+      document.getElementById('canvas-wrapper').style.transform = `scale(${val})`;
+    };
 
-    function toggleCables() {
+    window.toggleCables = function() {
       showCables = !showCables;
       document.getElementById('cable-layer').style.display = showCables ? 'block' : 'none';
-      renderCanvas(); // Her-teken om kabels te updaten
-    }
+      renderCanvas(); 
+    };
 
     function refreshDropdowns() {
       const ledSelect = document.getElementById('wall_led');
@@ -246,8 +270,8 @@
       db.procs.forEach(p => procSelect.innerHTML += `<option value="${p.id}">${p.name}</option>`);
     }
 
-    // --- OPSLAAN IN LOKALE BIBLIOTHEEK ---
-    function saveNewLed() {
+    // --- OPSLAAN IN BIBLIOTHEEK ---
+    window.saveNewLed = function() {
       const led = {
         id: 'led_' + Date.now(),
         name: document.getElementById('nl_name').value,
@@ -260,10 +284,11 @@
       db.leds.push(led);
       localStorage.setItem('pixelmap_leds', JSON.stringify(db.leds));
       refreshDropdowns();
-      alert("Paneel toegevoegd!");
-    }
+      alert("Paneel succesvol toegevoegd aan bibliotheek!");
+      document.getElementById('nl_name').value = ''; // Reset veld
+    };
 
-    function saveNewProcessor() {
+    window.saveNewProcessor = function() {
       const proc = {
         id: 'proc_' + Date.now(),
         name: document.getElementById('np_name').value,
@@ -274,16 +299,20 @@
       db.procs.push(proc);
       localStorage.setItem('pixelmap_procs', JSON.stringify(db.procs));
       refreshDropdowns();
-      alert("Processor toegevoegd!");
-    }
+      alert("Processor succesvol toegevoegd aan bibliotheek!");
+      document.getElementById('np_name').value = ''; // Reset veld
+    };
 
     // --- SCHERMEN LOGICA ---
-    function addWall() {
+    window.addWall = function() {
       const ledId = document.getElementById('wall_led').value;
       const led = db.leds.find(l => l.id === ledId);
       
+      const nameInput = document.getElementById('wall_name').value.trim();
+      const finalName = nameInput !== "" ? nameInput : 'Scherm ' + (walls.length + 1);
+      
       walls.push({
-        id: 'Scherm ' + (walls.length + 1),
+        id: finalName,
         led: led,
         cols: parseInt(document.getElementById('wall_cols').value),
         rows: parseInt(document.getElementById('wall_rows').value),
@@ -291,29 +320,42 @@
         y: parseInt(document.getElementById('wall_y').value)
       });
       
+      document.getElementById('wall_name').value = ''; // Maak veld weer leeg
       renderCanvas();
       calculateSchema();
-    }
+    };
 
-    function removeWall(index) {
+    window.removeWall = function(index) {
       walls.splice(index, 1);
       renderCanvas();
       calculateSchema();
-    }
+    };
 
-    // --- RENDERING & KABELS (ZIG-ZAG) ---
+    // --- NAAM AANPASSEN ---
+    window.renameWall = function(index) {
+      const currentName = walls[index].id;
+      const newName = prompt("Voer een nieuwe naam in voor dit scherm:", currentName);
+      
+      if (newName !== null && newName.trim() !== "") {
+        walls[index].id = newName.trim();
+        renderCanvas();
+        calculateSchema();
+      }
+    };
+
+    // --- RENDERING & KABELS ---
     function renderCanvas() {
       const container = document.getElementById('canvas-container');
       const cableLayer = document.getElementById('cable-layer');
       
-      // Verwijder oude muren, behoud de SVG
+      // Verwijder oude HTML muren, behoud de SVG layer
       Array.from(container.children).forEach(c => {
         if(c.id !== 'cable-layer') c.remove();
       });
-      cableLayer.innerHTML = ''; // Maak kabels leeg
+      cableLayer.innerHTML = ''; // Maak SVG lijnen leeg
 
       walls.forEach(wall => {
-        // Maak HTML Muur
+        // Bouw de HTML container
         const wDiv = document.createElement('div');
         wDiv.className = 'led-wall';
         wDiv.style.left = wall.x + 'px';
@@ -321,32 +363,32 @@
         wDiv.style.gridTemplateColumns = `repeat(${wall.cols}, ${wall.led.w}px)`;
         wDiv.style.gridTemplateRows = `repeat(${wall.rows}, ${wall.led.h}px)`;
         
-        let pathData = ""; // SVG Pad voor data
         let panelCenters = [];
-
         const total = wall.cols * wall.rows;
+        
         for (let i = 0; i < total; i++) {
           const p = document.createElement('div');
           p.className = 'led-panel';
-          p.innerText = i + 1; // Paneel nummer
+          
+          // Toon schermnaam en paneelnummer erin
+          p.innerHTML = `<span style="font-weight:bold; color:#fff;">${wall.id}</span><br>P${i + 1}`; 
           wDiv.appendChild(p);
 
-          // Bereken centrum voor SVG kabel (Simpele slinger van onder naar boven)
+          // Bereken centrum voor SVG datakabel (Zig-zag patroon)
           if(showCables) {
              const col = i % wall.cols;
              const row = Math.floor(i / wall.cols);
-             // Zig-zag patroon: even rijen links->rechts, oneven rechts->links
              const actualCol = (row % 2 === 0) ? col : (wall.cols - 1 - col); 
              
              const cx = wall.x + (actualCol * wall.led.w) + (wall.led.w / 2);
-             const cy = wall.y + ((wall.rows - 1 - row) * wall.led.h) + (wall.led.h / 2); // Start onderaan
+             const cy = wall.y + ((wall.rows - 1 - row) * wall.led.h) + (wall.led.h / 2); 
              panelCenters.push(`${cx},${cy}`);
           }
         }
         
         container.appendChild(wDiv);
 
-        // Teken SVG Kabel voor deze muur
+        // Teken SVG Kabel voor deze muur als ze aan staan
         if(showCables && panelCenters.length > 0) {
           const polyline = document.createElementNS('http://www.w3.org/2000/svg', 'polyline');
           polyline.setAttribute('points', panelCenters.join(' '));
@@ -357,7 +399,7 @@
     }
 
     // --- CALCULATIES ---
-    function calculateSchema() {
+    window.calculateSchema = function() {
       let gPx = 0, gKg = 0, gW = 0;
       
       const procId = document.getElementById('active_proc').value;
@@ -378,11 +420,11 @@
         const portsNeeded = Math.ceil(px / proc.px);
         const powerNeeded = Math.ceil(watt / maxPower);
 
-        // Voeg toe aan lijst
         listDiv.innerHTML += `
           <div class="card">
-            <div class="card-title" style="display:flex; justify-content:space-between;">
-              ${w.id} <button onclick="removeWall(${i})" style="width:auto; padding:2px 8px; background:var(--danger);">X</button>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 8px;">
+              <span style="font-weight:bold; font-size:14px; color:var(--accent); cursor:pointer;" onclick="renameWall(${i})" title="Klik om naam aan te passen">✏️ ${w.id}</span> 
+              <button class="danger" onclick="removeWall(${i})" style="width:auto; padding:3px 8px; font-size:11px;">X</button>
             </div>
             <div class="card-stat"><span>Type:</span> <span style="color:white;">${w.led.name} (${panels} stuks)</span></div>
             <div class="card-stat"><span>Resolutie:</span> <span>${w.cols * w.led.w} x ${w.rows * w.led.h} px</span></div>
@@ -393,7 +435,7 @@
         `;
       });
 
-      // Update totalen
+      // Update UI totalen
       document.getElementById('tot_px').innerText = gPx.toLocaleString();
       document.getElementById('tot_kg').innerText = gKg.toFixed(1) + ' kg';
       document.getElementById('tot_w').innerText = gW.toLocaleString() + ' W';
@@ -406,8 +448,9 @@
       pSpan.style.color = totalPorts > proc.ports ? 'var(--danger)' : 'white';
 
       document.getElementById('req_power').innerText = `${totalPower} groepen`;
-    }
+    };
 
+    // Start
     init();
   </script>
 </body>
