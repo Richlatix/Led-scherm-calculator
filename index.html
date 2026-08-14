@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pixelmap by MTR - V50 (Global Library Fix)</title>
+  <title>Pixelmap by MTR - V51 (Screen Coordinates)</title>
   
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -51,6 +51,11 @@
     .led-wall.hw-active { outline: 3px dashed #888; box-shadow: 0 0 30px rgba(255, 255, 255, 0.2); z-index: 50; }
     
     .wall-title-giant { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: 900; color: #d4af37; text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0px 4px 15px rgba(0,0,0,0.8); pointer-events: none; z-index: 15; white-space: nowrap; opacity: 0.85; font-family: Arial, Helvetica, sans-serif; letter-spacing: 1px; }
+
+    /* SCHERM COÖRDINATEN LABELS (START/STOP) */
+    .wall-coord-label { position: absolute; font-size: 13px; font-weight: bold; color: var(--accent); background: #111; padding: 3px 8px; z-index: 60; pointer-events: none; font-family: monospace; border: 1px solid var(--accent); box-shadow: 0 4px 10px rgba(0,0,0,0.8); }
+    .wall-coord-tl { top: -25px; left: -1px; border-radius: 6px 6px 0 0; border-bottom: none; }
+    .wall-coord-br { bottom: -25px; right: -1px; border-radius: 0 0 6px 6px; border-top: none; }
 
     .led-panel { position: absolute; border-style: solid; border-width: 1px; box-sizing: border-box; user-select: none; cursor: default; }
     .led-panel:hover { filter: brightness(1.4); z-index: 5; }
@@ -138,6 +143,10 @@
     .export-screen-mode .wall-title-giant { color: #e0e0e0; text-shadow: none; opacity: 0.6; } 
     .export-screen-mode .patch-bg { background-color: #fff; border: 1px solid #ccc; box-shadow: none; }
     
+    .export-screen-mode .wall-coord-label { background: #fff !important; color: #000 !important; border: 2px solid #000 !important; }
+    .export-screen-mode .wall-coord-tl { border-bottom: none !important; }
+    .export-screen-mode .wall-coord-br { border-top: none !important; }
+
     .export-data-only .power-cable, .export-data-only .power-marker, .export-data-only .p-text { display: none !important; }
     .export-power-only .data-cable, .export-power-only .data-marker, .export-power-only .d-text { display: none !important; }
     .export-png-mode .d-text, .export-png-mode .p-text { display: none !important; }
@@ -392,7 +401,7 @@
   </div>
 
   <script>
-    // --- SUPABASE CLOUD SETUP V50 ---
+    // --- SUPABASE CLOUD SETUP V51 ---
     const supabaseUrl = 'https://gjpoebdsyvqtxyazwmxp.supabase.co';
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdqcG9lYmRzeXZxdHh5YXp3bXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjU0NjcsImV4cCI6MjEwMjA0MTQ2N30.9SHv-ce1-ytuVKvh1ylT8ZPyYj0FXsz7Lk8rgsjSMsA';
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
@@ -432,7 +441,6 @@
         location.reload();
     }
 
-    // GLOBALE BIBLIOTHEEK + PROJECT DATA INLADEN
     async function loadProjectsListAndInit() {
         try {
             const { data, error } = await supabaseClient.from('pixelmap_app_state').select('*');
@@ -455,14 +463,12 @@
 
             updateProjectSelectorUI();
             
-            // V50: GLOBAAL INLADEN VAN BIBLIOTHEEK (Geen project ID als prefix!)
             let rowLeds = serverData.find(r => r.state_key === 'leds');
             let rowProcs = serverData.find(r => r.state_key === 'procs');
             
             db.leds = (rowLeds && rowLeds.state_value.length > 0) ? rowLeds.state_value : [...defaultLeds];
             db.procs = (rowProcs && rowProcs.state_value.length > 0) ? rowProcs.state_value : [...defaultProcs];
 
-            // PROJECT SPECIFIEKE DATA INLADEN
             let keyProjProcs = currentProjectId + '_proj_procs';
             let keyWalls = currentProjectId + '_walls';
             let keyInfo = currentProjectId + '_info';
@@ -504,7 +510,9 @@
             
         } catch(err) {
             console.error("Fout bij laden projectenlijst:", err);
-            alert("Let op: kon data niet inladen vanuit de cloud.\n\nFoutmelding: " + (err.message || JSON.stringify(err)));
+            alert("Let op: kon data niet inladen vanuit de cloud.
+
+Foutmelding: " + (err.message || JSON.stringify(err)));
         }
     }
 
@@ -627,7 +635,6 @@
             if(syncInd) { syncInd.innerText = "☁️ Fout bij opslaan!"; syncInd.style.color = "var(--danger)"; }
         }
     };
-    // --- EINDE SUPABASE SETUP ---
 
     const MAX_POWER_PER_GROUP = 3600;
     let activePatchWall = null; 
@@ -1051,6 +1058,17 @@
         const giantTitle = document.createElement('div'); giantTitle.className = 'wall-title-giant';
         giantTitle.innerText = wall.id; giantTitle.style.fontSize = Math.min(wallW * 0.15, 120) + 'px';
         wDiv.appendChild(giantTitle);
+
+        // V51: Scherm start en eind pixel coordinaten toevoegen
+        const tlLabel = document.createElement('div');
+        tlLabel.className = 'wall-coord-label wall-coord-tl';
+        tlLabel.innerHTML = `Start &rarr; X: ${wall.x} | Y: ${wall.y}`;
+        wDiv.appendChild(tlLabel);
+
+        const brLabel = document.createElement('div');
+        brLabel.className = 'wall-coord-label wall-coord-br';
+        brLabel.innerHTML = `Eind &rarr; X: ${wall.x + wallW} | Y: ${wall.y + wallH}`;
+        wDiv.appendChild(brLabel);
 
         let overlapL = Math.max(0, wall.x); let overlapR = Math.min(cWidth, wall.x + wallW);
         let overlapT = Math.max(0, wall.y); let overlapB = Math.min(cHeight, wall.y + wallH);
@@ -1529,6 +1547,7 @@
         }
       } else { banner.style.display = 'none'; }
 
+      // Sync bomTotals with calculated totals
       bomTotals.px = calcData.px;
       bomTotals.kg = calcData.kg;
       bomTotals.watt = calcData.watt;
@@ -1618,6 +1637,9 @@
 
                 let cX = wall.x - padding; let cY = wall.y - padding;
                 let cW = wallW + (padding * 2); let cH = wallH + (padding * 2) + 60; 
+                
+                cX = Math.max(0, cX);
+                cY = Math.max(0, cY);
 
                 container.classList.add('export-data-only');
                 await addPageToPDF(`Data Patch - ${wall.id}`, true, cX, cY, cW, cH);
