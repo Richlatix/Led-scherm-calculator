@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pixelmap by MTR - V49 (Multi-Project Cloud)</title>
+  <title>Pixelmap by MTR - V50 (Global Library Fix)</title>
   
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -392,7 +392,7 @@
   </div>
 
   <script>
-    // --- SUPABASE CLOUD SETUP V49 ---
+    // --- SUPABASE CLOUD SETUP V50 ---
     const supabaseUrl = 'https://gjpoebdsyvqtxyazwmxp.supabase.co';
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdqcG9lYmRzeXZxdHh5YXp3bXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjU0NjcsImV4cCI6MjEwMjA0MTQ2N30.9SHv-ce1-ytuVKvh1ylT8ZPyYj0FXsz7Lk8rgsjSMsA';
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
@@ -404,8 +404,9 @@
         { id: 'roe_bp2', name: 'ROE BP2V2', physW: 500, physH: 500, pxW: 176, pxH: 176, watt: 160, kg: 8.5, hasAlt: false }, 
         { id: 'abs_p3', name: 'Absen P3.9 (Mix)', physW: 1000, physH: 500, pxW: 256, pxH: 128, watt: 240, kg: 14.0, hasAlt: true, altPhysW: 500, altPhysH: 500, altPxW: 128, altPxH: 128, altWatt: 120, altKg: 7.0 }
     ];
+    let defaultProcs = [ { id: 'mx2000', name: 'Novastar MX2000', px: 650000, isFiber: true, fibers: 4, portsPerFiber: 10, ports: 40 }, { id: 'mctrl4k', name: 'Novastar MCTRL4K', px: 650000, isFiber: false, ports: 16 } ];
 
-    let db = { leds: [...defaultLeds], procs: [ { id: 'mx2000', name: 'Novastar MX2000', px: 650000, isFiber: true, fibers: 4, portsPerFiber: 10, ports: 40 }, { id: 'mctrl4k', name: 'Novastar MCTRL4K', px: 650000, isFiber: false, ports: 16 } ] };
+    let db = { leds: [...defaultLeds], procs: [...defaultProcs] };
     let projectProcs = [];
     let walls = [];
     let allProjectsList = [];
@@ -431,7 +432,7 @@
         location.reload();
     }
 
-    // SLIMME ENKELVOUDIGE TABEL STRUCTUUR VOOR MULTI-PROJECT
+    // GLOBALE BIBLIOTHEEK + PROJECT DATA INLADEN
     async function loadProjectsListAndInit() {
         try {
             const { data, error } = await supabaseClient.from('pixelmap_app_state').select('*');
@@ -439,7 +440,6 @@
 
             let serverData = data || [];
             
-            // Haal de master list met projecten op
             let projListRow = serverData.find(r => r.state_key === 'projects_list');
             if (projListRow) {
                 allProjectsList = projListRow.state_value;
@@ -448,7 +448,6 @@
                 await supabaseClient.from('pixelmap_app_state').upsert({ state_key: 'projects_list', state_value: allProjectsList }, { onConflict: 'state_key' });
             }
 
-            // Controleer of huidig project nog bestaat, anders pak de eerste
             if (!allProjectsList.find(p => p.id === currentProjectId)) {
                 currentProjectId = allProjectsList[0].id;
                 localStorage.setItem('pixelmap_active_project', currentProjectId);
@@ -456,21 +455,22 @@
 
             updateProjectSelectorUI();
             
-            // Laad de data specifiek voor het actieve project via dynamische keys
-            let keyLeds = currentProjectId + '_leds';
-            let keyProcs = currentProjectId + '_procs';
+            // V50: GLOBAAL INLADEN VAN BIBLIOTHEEK (Geen project ID als prefix!)
+            let rowLeds = serverData.find(r => r.state_key === 'leds');
+            let rowProcs = serverData.find(r => r.state_key === 'procs');
+            
+            db.leds = (rowLeds && rowLeds.state_value.length > 0) ? rowLeds.state_value : [...defaultLeds];
+            db.procs = (rowProcs && rowProcs.state_value.length > 0) ? rowProcs.state_value : [...defaultProcs];
+
+            // PROJECT SPECIFIEKE DATA INLADEN
             let keyProjProcs = currentProjectId + '_proj_procs';
             let keyWalls = currentProjectId + '_walls';
             let keyInfo = currentProjectId + '_info';
 
-            let rowLeds = serverData.find(r => r.state_key === keyLeds);
-            let rowProcs = serverData.find(r => r.state_key === keyProcs);
             let rowProjProcs = serverData.find(r => r.state_key === keyProjProcs);
             let rowWalls = serverData.find(r => r.state_key === keyWalls);
             let rowInfo = serverData.find(r => r.state_key === keyInfo);
 
-            db.leds = (rowLeds && rowLeds.state_value.length > 0) ? rowLeds.state_value : [...defaultLeds];
-            db.procs = (rowProcs && rowProcs.state_value.length > 0) ? rowProcs.state_value : [ { id: 'mx2000', name: 'Novastar MX2000', px: 650000, isFiber: true, fibers: 4, portsPerFiber: 10, ports: 40 }, { id: 'mctrl4k', name: 'Novastar MCTRL4K', px: 650000, isFiber: false, ports: 16 } ];
             projectProcs = (rowProjProcs) ? rowProjProcs.state_value : [];
             
             walls = (rowWalls ? rowWalls.state_value : []).map(w => {
@@ -535,15 +535,11 @@
         allProjectsList.push({ id: pId, name: pName.trim() });
         
         let pInfo = { name: pName.trim(), loc: '', date: '', tech: '', canW: 3840, canH: 2160 };
-        let initialLeds = [...defaultLeds];
-        let initialProcs = [ { id: 'mx2000', name: 'Novastar MX2000', px: 650000, isFiber: true, fibers: 4, portsPerFiber: 10, ports: 40 }, { id: 'mctrl4k', name: 'Novastar MCTRL4K', px: 650000, isFiber: false, ports: 16 } ];
-        let initialProjProcs = [{ id: 'p_'+Date.now(), dbId: initialProcs[0].id }];
+        let initialProjProcs = [{ id: 'p_'+Date.now(), dbId: db.procs[0].id }];
 
         try {
             await Promise.all([
                 supabaseClient.from('pixelmap_app_state').upsert({ state_key: 'projects_list', state_value: allProjectsList }, { onConflict: 'state_key' }),
-                supabaseClient.from('pixelmap_app_state').upsert({ state_key: pId + '_leds', state_value: initialLeds }, { onConflict: 'state_key' }),
-                supabaseClient.from('pixelmap_app_state').upsert({ state_key: pId + '_procs', state_value: initialProcs }, { onConflict: 'state_key' }),
                 supabaseClient.from('pixelmap_app_state').upsert({ state_key: pId + '_proj_procs', state_value: initialProjProcs }, { onConflict: 'state_key' }),
                 supabaseClient.from('pixelmap_app_state').upsert({ state_key: pId + '_walls', state_value: [] }, { onConflict: 'state_key' }),
                 supabaseClient.from('pixelmap_app_state').upsert({ state_key: pId + '_info', state_value: pInfo }, { onConflict: 'state_key' })
@@ -570,8 +566,7 @@
         try {
             await supabaseClient.from('pixelmap_app_state').upsert({ state_key: 'projects_list', state_value: allProjectsList }, { onConflict: 'state_key' });
             
-            // Clean up old keys (optioneel, we gooien ze nu voor het gemak weg via supabase UI of laten ze wezenzen)
-            await supabaseClient.from('pixelmap_app_state').delete().in('state_key', [currentProjectId + '_leds', currentProjectId + '_procs', currentProjectId + '_proj_procs', currentProjectId + '_walls', currentProjectId + '_info']);
+            await supabaseClient.from('pixelmap_app_state').delete().in('state_key', [currentProjectId + '_proj_procs', currentProjectId + '_walls', currentProjectId + '_info']);
             
             currentProjectId = allProjectsList[0].id;
             localStorage.setItem('pixelmap_active_project', currentProjectId);
@@ -596,7 +591,7 @@
             canH: parseInt(document.getElementById('canH').value)
         };
 
-        // Update project naam in master list als deze is gewijzigd
+        let currentProjName = projInfo.name || "Project " + currentProjectId;
         let pObj = allProjectsList.find(p => p.id === currentProjectId);
         let nameChanged = false;
         if(pObj && projInfo.name && pObj.name !== projInfo.name) {
@@ -606,8 +601,8 @@
 
         try {
             let promises = [
-                supabaseClient.from('pixelmap_app_state').upsert({ state_key: currentProjectId + '_leds', state_value: db.leds }, { onConflict: 'state_key' }),
-                supabaseClient.from('pixelmap_app_state').upsert({ state_key: currentProjectId + '_procs', state_value: db.procs }, { onConflict: 'state_key' }),
+                supabaseClient.from('pixelmap_app_state').upsert({ state_key: 'leds', state_value: db.leds }, { onConflict: 'state_key' }),
+                supabaseClient.from('pixelmap_app_state').upsert({ state_key: 'procs', state_value: db.procs }, { onConflict: 'state_key' }),
                 supabaseClient.from('pixelmap_app_state').upsert({ state_key: currentProjectId + '_proj_procs', state_value: projectProcs }, { onConflict: 'state_key' }),
                 supabaseClient.from('pixelmap_app_state').upsert({ state_key: currentProjectId + '_walls', state_value: walls }, { onConflict: 'state_key' }),
                 supabaseClient.from('pixelmap_app_state').upsert({ state_key: currentProjectId + '_info', state_value: projInfo }, { onConflict: 'state_key' })
@@ -835,7 +830,6 @@
       }
     };
 
-    // Engine: W, H, X, Y in Pixels op Canvas. Physics berekent via physW/physH
     function getWallPanels(wall) {
         let panels = [];
         for(let r=0; r<wall.rows; r++) {
@@ -1624,9 +1618,6 @@
 
                 let cX = wall.x - padding; let cY = wall.y - padding;
                 let cW = wallW + (padding * 2); let cH = wallH + (padding * 2) + 60; 
-                
-                cX = Math.max(0, cX);
-                cY = Math.max(0, cY);
 
                 container.classList.add('export-data-only');
                 await addPageToPDF(`Data Patch - ${wall.id}`, true, cX, cY, cW, cH);
@@ -1701,7 +1692,7 @@
         
         try {
             const canvas = await html2canvas(container, { scale: 1, width: parseInt(document.getElementById('canW').value), height: parseInt(document.getElementById('canH').value), backgroundColor: '#000000', logging: false });
-            const link = document.createElement('a'); const pName = document.getElementById('pi_name').value || 'Project';
+            const link = document.createElement('a'); const pName = document.getElementById('pi_name').value || 'Projecten';
             const suffix = withCables ? '_Met_Kabels' : '_Masker'; link.download = `Pixelmap${suffix}_${pName.replace(/\s+/g, '_')}.png`; link.href = canvas.toDataURL('image/png'); link.click();
         } catch(e) { console.error(e); alert('Fout bij exporteren PNG'); } 
         finally {
