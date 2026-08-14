@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pixelmap by MTR - V53 (PDF Label Fix)</title>
+  <title>Pixelmap by MTR - V55 (Smart Stackframe Engine)</title>
   
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -27,7 +27,6 @@
     .login-box { background: var(--bg-panel); padding: 40px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 10px 50px rgba(0,0,0,0.8); text-align: center; }
 
     #sidebar-left { width: 340px; min-width: 340px; max-width: 340px; background: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 50; box-shadow: 2px 0 20px rgba(0,0,0,0.5); overflow-y: auto; }
-    /* WORKSPACE PADDING AANGEPAST VOOR EXTRA RIGGING RUIMTE (150px top) */
     #workspace { flex: 1 1 auto; min-width: 0; min-height: 0; position: relative; overflow: auto; background: var(--bg-app); padding: 150px 40px 100px 40px; cursor: grab; z-index: 1; }
     #workspace.dragging { cursor: grabbing; }
     #sidebar-right { width: 360px; min-width: 360px; max-width: 360px; background: var(--bg-panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; z-index: 50; box-shadow: -2px 0 20px rgba(0,0,0,0.5); overflow-y: auto; }
@@ -53,10 +52,9 @@
     
     .wall-title-giant { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: 900; color: #d4af37; text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0px 4px 15px rgba(0,0,0,0.8); pointer-events: none; z-index: 15; white-space: nowrap; opacity: 0.85; font-family: Arial, Helvetica, sans-serif; letter-spacing: 1px; }
 
-    /* SCHERM COÖRDINATEN LABELS (START/STOP) - Nu met white-space nowrap om wrap-fouten te voorkomen */
     .wall-coord-label { position: absolute; font-size: 13px; font-weight: bold; color: var(--accent); background: #111; padding: 3px 8px; z-index: 60; pointer-events: none; font-family: monospace; border: 1px solid var(--accent); box-shadow: 0 4px 10px rgba(0,0,0,0.8); white-space: nowrap; }
-    .wall-coord-tl { top: -25px; left: -1px; border-radius: 6px 6px 0 0; border-bottom: none; }
-    .wall-coord-br { bottom: -25px; right: -1px; border-radius: 0 0 6px 6px; border-top: none; }
+    .wall-coord-tl { top: -1px; right: 100%; border-radius: 6px 0 0 6px; border-right: none; margin-right: 1px; }
+    .wall-coord-br { bottom: -1px; left: 100%; border-radius: 0 6px 6px 0; border-left: none; margin-left: 1px; }
 
     .led-panel { position: absolute; border-style: solid; border-width: 1px; box-sizing: border-box; user-select: none; cursor: default; }
     .led-panel:hover { filter: brightness(1.4); z-index: 5; }
@@ -65,7 +63,7 @@
 
     .patch-bg { background-color: #111; border: 1px solid #333; padding: 2px 6px; border-radius: 4px; box-shadow: 0 0 10px rgba(0,0,0,0.9); }
 
-    /* HARDWARE VISUALS OP PIXEL SCHAAL */
+    /* HARDWARE VISUALS */
     .stack-ladder { position: absolute; width: 16px; left: calc(50% - 8px); bottom: 0; background-image: repeating-linear-gradient(0deg, transparent, transparent 18px, #1a1a1a 18px, #1a1a1a 22px); border-left: 2px solid #555; border-right: 2px solid #555; z-index: 0; pointer-events: none; opacity: 0.95; display: none; box-shadow: inset 1px 0 0 rgba(255,255,255,0.1), inset -1px 0 0 rgba(0,0,0,0.5); }
     .stack-base { position: absolute; width: calc(100% + 4px); height: 16px; bottom: -16px; left: -2px; background: linear-gradient(180deg, #555, #222); border: 1px solid #000; z-index: 6; pointer-events: none; box-shadow: 0 5px 10px rgba(0,0,0,0.8); border-radius: 2px; display: none; }
     .stack-foot { position: absolute; width: 16px; height: 6px; bottom: -22px; left: calc(50% - 8px); background: #111; border-radius: 4px; border-bottom: 2px solid #000; z-index: 5; pointer-events: none; display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
@@ -144,10 +142,9 @@
     .export-screen-mode .wall-title-giant { color: #e0e0e0; text-shadow: none; opacity: 0.6; } 
     .export-screen-mode .patch-bg { background-color: #fff; border: 1px solid #ccc; box-shadow: none; }
     
-    /* V53: Verwijder de box-shadow op de wall-coords tijdens PDF export om rendering bugs te voorkomen */
     .export-screen-mode .wall-coord-label { background: #fff !important; color: #000 !important; border: 2px solid #000 !important; box-shadow: none !important; white-space: nowrap !important; }
-    .export-screen-mode .wall-coord-tl { border-bottom: none !important; }
-    .export-screen-mode .wall-coord-br { border-top: none !important; }
+    .export-screen-mode .wall-coord-tl { border-right: none !important; }
+    .export-screen-mode .wall-coord-br { border-left: none !important; }
 
     .export-data-only .power-cable, .export-data-only .power-marker, .export-data-only .p-text { display: none !important; }
     .export-power-only .data-cable, .export-power-only .data-marker, .export-power-only .d-text { display: none !important; }
@@ -404,7 +401,7 @@
   </div>
 
   <script>
-    // --- SUPABASE CLOUD SETUP V53 ---
+    // --- SUPABASE CLOUD SETUP V55 ---
     const supabaseUrl = 'https://gjpoebdsyvqtxyazwmxp.supabase.co';
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdqcG9lYmRzeXZxdHh5YXp3bXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjU0NjcsImV4cCI6MjEwMjA0MTQ2N30.9SHv-ce1-ytuVKvh1ylT8ZPyYj0FXsz7Lk8rgsjSMsA';
     const supabaseClient = typeof supabase !== 'undefined' ? supabase.createClient(supabaseUrl, supabaseKey) : null;
@@ -857,6 +854,7 @@
         return panels;
     }
 
+    // V55 SMART MAST ENGINE
     window.handleTileClick = function(wIndex, panelId) {
       if (activePatchWall !== wIndex) return;
       const wall = walls[wIndex]; const panels = getWallPanels(wall); const clickedPanel = panels.find(p => p.id === panelId);
@@ -877,27 +875,14 @@
       
       if (activePatchType === 'stackframe') {
           let isBottom = !panels.some(other => other.baseC === clickedPanel.baseC && other.y > clickedPanel.y);
-          
-          let propName;
-          if (activeStackTool === 'ladder_1m') propName = 'ladders_1m';
-          else if (activeStackTool === 'ladder_05m') propName = 'ladders_05m';
-          else propName = activeStackTool + 's';
-
-          let arr = wall.stack[propName] || [];
-          let exists = arr.includes(panelId);
-          let doAdd = false;
-
-          if (isPatchDragging && window.patchDrawAction) {
-              if (window.patchDrawAction === 'add' && !exists) doAdd = true;
-              else if (window.patchDrawAction === 'remove' && exists) doAdd = false;
-              else return; 
-          } else { doAdd = !exists; }
+          let propName = activeStackTool === 'ladder_1m' ? 'ladders_1m' : (activeStackTool === 'ladder_05m' ? 'ladders_05m' : activeStackTool + 's');
+          let exists = (wall.stack[propName] || []).includes(panelId);
+          let doAdd = isPatchDragging && window.patchDrawAction ? (window.patchDrawAction === 'add') : !exists;
 
           if (activeStackTool === 'base') {
               if (!isBottom) return; 
-              if (doAdd) { 
-                  wall.stack.bases.push(panelId); 
-              } else { 
+              if (doAdd) { wall.stack.bases.push(panelId); } 
+              else { 
                   wall.stack.bases = wall.stack.bases.filter(id => id !== panelId); 
                   let colPanels = panels.filter(p => p.baseC === clickedPanel.baseC).map(p=>p.id);
                   wall.stack.ladders_1m = wall.stack.ladders_1m.filter(id => !colPanels.includes(id));
@@ -906,9 +891,7 @@
               }
           } 
           else if (activeStackTool === 'ladder_1m' || activeStackTool === 'ladder_05m') {
-              let baseExists = wall.stack.bases.some(bId => {
-                  let bp = panels.find(p=>p.id === bId); return bp && bp.baseC === clickedPanel.baseC;
-              });
+              let baseExists = wall.stack.bases.some(bId => panels.find(p=>p.id === bId).baseC === clickedPanel.baseC);
               if (!baseExists) {
                   const banner = document.getElementById('patch-instruction'); let oldBg = banner.style.backgroundColor; banner.style.backgroundColor = 'var(--danger)'; setTimeout(() => banner.style.backgroundColor = oldBg, 300); return;
               }
@@ -917,43 +900,36 @@
                   wall.stack.ladders_05m = wall.stack.ladders_05m.filter(id => id !== panelId);
                   wall.stack[propName].push(panelId); 
               } 
-              else { 
-                  wall.stack[propName] = wall.stack[propName].filter(id => id !== panelId); 
-                  
-                  wall.stack.fliepels = wall.stack.fliepels.filter(fId => {
-                      let fPanel = panels.find(p => p.id === fId);
-                      if(!fPanel) return false;
-                      let overlaps = false;
-                      panels.forEach(L => {
-                          if (wall.stack.ladders_1m.includes(L.id)) {
-                              let pxPerMmY = L.h / L.physH; let lPxH = 1000 * pxPerMmY;
-                              let lTop = L.y + L.h - lPxH; let lBottom = L.y + L.h;
-                              if (fPanel.baseC === L.baseC && (fPanel.y + fPanel.h/2) >= lTop && (fPanel.y + fPanel.h/2) <= lBottom) overlaps = true;
-                          }
-                          if (wall.stack.ladders_05m.includes(L.id)) {
-                              let pxPerMmY = L.h / L.physH; let lPxH = 500 * pxPerMmY;
-                              let lTop = L.y + L.h - lPxH; let lBottom = L.y + L.h;
-                              if (fPanel.baseC === L.baseC && (fPanel.y + fPanel.h/2) >= lTop && (fPanel.y + fPanel.h/2) <= lBottom) overlaps = true;
-                          }
-                      });
-                      return overlaps;
-                  });
-              }
+              else { wall.stack[propName] = wall.stack[propName].filter(id => id !== panelId); }
+              
+              // Smart cleanup: fliepels moeten het metaal van de mast nog raken
+              wall.stack.fliepels = wall.stack.fliepels.filter(fId => {
+                  let fPanel = panels.find(p => p.id === fId);
+                  if(!fPanel) return false;
+                  let colPanelsList = panels.filter(p => p.baseC === fPanel.baseC);
+                  let bottomT = colPanelsList.reduce((prev, curr) => (prev.y > curr.y) ? prev : curr);
+                  let bY = bottomT.y + bottomT.h;
+                  let c1m = colPanelsList.filter(p => wall.stack.ladders_1m.includes(p.id)).length;
+                  let c05m = colPanelsList.filter(p => wall.stack.ladders_05m.includes(p.id)).length;
+                  let pxRatio = bottomT.h / bottomT.physH;
+                  let mastH = ((c1m * 1000) + (c05m * 500)) * pxRatio;
+                  let topY = bY - mastH;
+                  let fY = fPanel.y + (fPanel.h / 2);
+                  return (fY >= topY && fY <= bY);
+              });
           }
           else if (activeStackTool === 'fliepel') {
-              let ladderOverlaps = false;
-              panels.forEach(L => {
-                  if (wall.stack.ladders_1m.includes(L.id)) {
-                      let pxPerMmY = L.h / L.physH; let lPxH = 1000 * pxPerMmY;
-                      let lTop = L.y + L.h - lPxH; let lBottom = L.y + L.h;
-                      if (clickedPanel.baseC === L.baseC && (clickedPanel.y + clickedPanel.h/2) >= lTop && (clickedPanel.y + clickedPanel.h/2) <= lBottom) ladderOverlaps = true;
-                  }
-                  if (wall.stack.ladders_05m.includes(L.id)) {
-                      let pxPerMmY = L.h / L.physH; let lPxH = 500 * pxPerMmY;
-                      let lTop = L.y + L.h - lPxH; let lBottom = L.y + L.h;
-                      if (clickedPanel.baseC === L.baseC && (clickedPanel.y + clickedPanel.h/2) >= lTop && (clickedPanel.y + clickedPanel.h/2) <= lBottom) ladderOverlaps = true;
-                  }
-              });
+              let colPanelsList = panels.filter(p => p.baseC === clickedPanel.baseC);
+              let bottomT = colPanelsList.reduce((prev, curr) => (prev.y > curr.y) ? prev : curr);
+              let bY = bottomT.y + bottomT.h;
+              let c1m = colPanelsList.filter(p => wall.stack.ladders_1m.includes(p.id)).length;
+              let c05m = colPanelsList.filter(p => wall.stack.ladders_05m.includes(p.id)).length;
+              let pxRatio = bottomT.h / bottomT.physH;
+              let mastH = ((c1m * 1000) + (c05m * 500)) * pxRatio;
+              let topY = bY - mastH;
+              let fY = clickedPanel.y + (clickedPanel.h / 2);
+              
+              let ladderOverlaps = (fY >= topY && fY <= bY);
               if (!ladderOverlaps) {
                   const banner = document.getElementById('patch-instruction'); let oldBg = banner.style.backgroundColor; banner.style.backgroundColor = 'var(--danger)'; setTimeout(() => banner.style.backgroundColor = oldBg, 300); return;
               }
@@ -1271,7 +1247,47 @@
         legendDiv.innerHTML = `<strong>${wall.id} Legenda</strong><hr style="border:0; border-top:1px solid #ccc; margin:5px 0;">` + dataLegendItems.join('') + powerLegendItems.join('') + hwLegendItems;
         textLayer.appendChild(legendDiv);
 
-        // HTML LAYERS
+        // V55: SMART MAST ENGINE RENDERING
+        if (wall.mount === 'stack') {
+            let uniqueCols = [...new Set(panelsArray.map(p => p.baseC))];
+            uniqueCols.forEach(c => {
+                let colPanelsList = panelsArray.filter(pa => pa.baseC === c);
+                let bottomTile = colPanelsList.reduce((prev, curr) => (prev.y > curr.y) ? prev : curr);
+                
+                let isBottomTile = bottomTiles.some(b => b.id === bottomTile.id);
+                if (isBottomTile) {
+                    let mastHTML = '';
+                    mastHTML += `<div class="stack-foot"></div>`;
+                    
+                    let hasBase = wall.stack.bases.some(bId => panelsArray.find(p=>p.id === bId).baseC === c);
+                    if (hasBase) mastHTML += `<div class="stack-base"></div>`;
+                    
+                    let c1m = colPanelsList.filter(pa => wall.stack.ladders_1m.includes(pa.id)).length;
+                    let c05m = colPanelsList.filter(pa => wall.stack.ladders_05m.includes(pa.id)).length;
+                    
+                    if (c1m > 0 || c05m > 0) {
+                        let pxRatio = bottomTile.h / bottomTile.physH;
+                        let mastPx = ((c1m * 1000) + (c05m * 500)) * pxRatio;
+                        // Single continuous mast from bottom
+                        mastHTML += `<div class="stack-ladder" style="display:block !important; height:${mastPx}px;"></div>`;
+                    }
+                    
+                    // Attach mast to the bottom tile DOM element
+                    let bDiv = document.createElement('div');
+                    bDiv.style.position = 'absolute';
+                    bDiv.style.left = bottomTile.x + 'px';
+                    bDiv.style.top = bottomTile.y + 'px';
+                    bDiv.style.width = bottomTile.w + 'px';
+                    bDiv.style.height = bottomTile.h + 'px';
+                    bDiv.style.pointerEvents = 'none';
+                    bDiv.style.zIndex = '4'; // behind panel text but above panel background
+                    bDiv.innerHTML = mastHTML;
+                    wDiv.appendChild(bDiv);
+                }
+            });
+        }
+
+        // HTML LAYERS FOR PANELS
         panelsArray.forEach(pData => {
             const p = document.createElement('div'); p.className = 'led-panel';
             const tileAbsX = wall.x + pData.x; const tileAbsY = wall.y + pData.y;
@@ -1295,8 +1311,7 @@
                 p.onmousedown = (e) => { 
                     isPatchDragging = true; lastDraggedTileStr = pData.id; 
                     if(activePatchType === 'stackframe') { 
-                        let arr = activeStackTool === 'ladder_1m' ? wall.stack.ladders_1m : (activeStackTool === 'ladder_05m' ? wall.stack.ladders_05m : wall.stack[activeStackTool + 's']);
-                        window.patchDrawAction = arr.includes(pData.id) ? 'remove' : 'add'; 
+                        window.patchDrawAction = (wall.stack[activeStackTool === 'ladder_1m' ? 'ladders_1m' : (activeStackTool === 'ladder_05m' ? 'ladders_05m' : activeStackTool + 's')] || []).includes(pData.id) ? 'remove' : 'add'; 
                     }
                     window.handleTileClick(wIndex, pData.id); e.stopPropagation(); 
                 };
@@ -1311,20 +1326,7 @@
             
             let stackHTML = '';
             if (wall.mount === 'stack') {
-                if (bottomTiles.find(b => b.id === pData.id)) stackHTML += `<div class="stack-foot"></div>`;
-                if (wall.stack.bases.includes(pData.id)) stackHTML += `<div class="stack-base"></div>`;
-                
-                let pxPerMmY = pData.h / pData.physH;
-                
-                if (wall.stack.ladders_1m.includes(pData.id)) {
-                    let lHeight = 1000 * pxPerMmY;
-                    stackHTML += `<div class="stack-ladder stack-ladder-1m" style="height:${lHeight}px;"></div>`;
-                }
-                if (wall.stack.ladders_05m.includes(pData.id)) {
-                    let lHeight = 500 * pxPerMmY;
-                    stackHTML += `<div class="stack-ladder stack-ladder-05m" style="height:${lHeight}px;"></div>`;
-                }
-                if (wall.stack.fliepels.includes(pData.id)) stackHTML += `<div class="stack-fliepel"></div>`;
+                if (wall.stack.fliepels.includes(pData.id)) stackHTML += `<div class="stack-fliepel" style="display:flex !important;"></div>`;
             }
             p.innerHTML = stackHTML;
             wDiv.appendChild(p);
@@ -1551,7 +1553,6 @@
         }
       } else { banner.style.display = 'none'; }
 
-      // Sync bomTotals with calculated totals
       bomTotals.px = calcData.px;
       bomTotals.kg = calcData.kg;
       bomTotals.watt = calcData.watt;
