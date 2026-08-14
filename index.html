@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pixelmap by MTR - V48 (Cloud Status Indicator)</title>
+  <title>Pixelmap by MTR - V49 (Multi-Project Cloud)</title>
   
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -68,7 +68,6 @@
     .stack-fliepel { position: absolute; width: 20px; height: 10px; left: calc(50% - 10px); top: calc(50% - 5px); background: #0088ff; border: 1px solid #0055cc; border-top: 1px solid #33aaff; border-radius: 2px; z-index: 6; pointer-events: none; box-shadow: 0 2px 5px rgba(0,0,0,0.6); display: none; align-items: center; justify-content: space-between; padding: 0 2px; }
     .stack-fliepel::before, .stack-fliepel::after { content: ''; width: 4px; height: 4px; background: #222; border-radius: 50%; box-shadow: inset 1px 1px 1px #000, inset -1px -1px 1px #555; }
 
-    /* Normale Rigging Elementen */
     .rig-bar { position: absolute; height: 14px; top: -14px; background: linear-gradient(180deg, #444, #111); border: 1px solid #000; border-bottom: none; z-index: 5; box-shadow: 0 -3px 5px rgba(0,0,0,0.5); border-radius: 2px 2px 0 0; display: none; }
     .rig-shackle { position: absolute; width: 16px; height: 20px; top: -34px; border: 4px solid #aaa; border-radius: 50% 50% 10% 10%; z-index: 6; box-shadow: 0 2px 4px rgba(0,0,0,0.5), inset 0 1px 1px rgba(255,255,255,0.4); display: none; transition: 0.2s; pointer-events: none; }
     
@@ -178,6 +177,20 @@
     </div>
     <div class="panel-content">
       
+      <!-- 0. MULTI-PROJECT SELECTOR -->
+      <details open style="border-color: var(--warning);">
+        <summary style="color: var(--warning);">0. Actief Project</summary>
+        <div class="form-group" style="margin-top:10px;">
+          <label>Kies of Maak Project</label>
+          <div style="display:flex; gap:5px;">
+            <select id="project-selector" onchange="switchProject(this.value)" style="flex:1; padding:4px; font-size:12px;"></select>
+            <button class="outline" onclick="createNewProject()" style="width:auto; padding:4px 8px;" title="Nieuw Project">+ Nieuw</button>
+            <button class="danger" onclick="deleteCurrentProject()" style="width:auto; padding:4px 8px;" title="Verwijder Project">🗑️</button>
+          </div>
+        </div>
+      </details>
+
+      <!-- 1. CANVAS FORMAAT -->
       <details open>
         <summary>1. Canvas Formaat (Pixels)</summary>
         <div class="form-row">
@@ -186,6 +199,7 @@
         </div>
       </details>
 
+      <!-- 2. SCHERM PLAATSEN -->
       <details open style="border-color: var(--accent);">
         <summary>2. Scherm Plaatsen</summary>
         <div class="form-group"><label>Scherm Naam</label><input type="text" id="wall_name" placeholder="Optioneel..."></div>
@@ -204,6 +218,7 @@
         </div>
       </details>
 
+      <!-- 3. PROJECT INFORMATIE -->
       <details open>
         <summary>3. Project Informatie</summary>
         <div class="form-group"><label>Projectnaam</label><input type="text" id="pi_name" placeholder="Bijv. Mainstage Festival" onchange="saveAppCloudState()"></div>
@@ -214,6 +229,7 @@
         </div>
       </details>
 
+      <!-- 4. BIBLIOTHEEK -->
       <details id="details_lib">
         <summary>4. Bibliotheek</summary>
         <div class="form-row">
@@ -376,25 +392,27 @@
   </div>
 
   <script>
-    // --- SUPABASE CLOUD SETUP V48 ---
+    // --- SUPABASE CLOUD SETUP V49 ---
     const supabaseUrl = 'https://gjpoebdsyvqtxyazwmxp.supabase.co';
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdqcG9lYmRzeXZxdHh5YXp3bXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjU0NjcsImV4cCI6MjEwMjA0MTQ2N30.9SHv-ce1-ytuVKvh1ylT8ZPyYj0FXsz7Lk8rgsjSMsA';
     const supabaseClient = supabase.createClient(supabaseUrl, supabaseKey);
 
     let isLoggedIn = localStorage.getItem('pixelmap_auth') === 'true';
+    let currentProjectId = localStorage.getItem('pixelmap_active_project') || 'default_project';
 
     let defaultLeds = [
         { id: 'roe_bp2', name: 'ROE BP2V2', physW: 500, physH: 500, pxW: 176, pxH: 176, watt: 160, kg: 8.5, hasAlt: false }, 
         { id: 'abs_p3', name: 'Absen P3.9 (Mix)', physW: 1000, physH: 500, pxW: 256, pxH: 128, watt: 240, kg: 14.0, hasAlt: true, altPhysW: 500, altPhysH: 500, altPxW: 128, altPxH: 128, altWatt: 120, altKg: 7.0 }
     ];
 
-    let db = { leds: [...defaultLeds], procs: [] };
+    let db = { leds: [...defaultLeds], procs: [ { id: 'mx2000', name: 'Novastar MX2000', px: 650000, isFiber: true, fibers: 4, portsPerFiber: 10, ports: 40 }, { id: 'mctrl4k', name: 'Novastar MCTRL4K', px: 650000, isFiber: false, ports: 16 } ] };
     let projectProcs = [];
     let walls = [];
+    let allProjectsList = [];
 
     if(isLoggedIn) {
         document.getElementById('login-overlay').style.display = 'none';
-        initAppFromCloud();
+        loadProjectsListAndInit();
     }
 
     window.checkLogin = function() {
@@ -402,7 +420,7 @@
             localStorage.setItem('pixelmap_auth', 'true');
             isLoggedIn = true;
             document.getElementById('login-overlay').style.display = 'none';
-            initAppFromCloud();
+            loadProjectsListAndInit();
         } else {
             document.getElementById('login-error').style.display = 'block';
         }
@@ -413,53 +431,156 @@
         location.reload();
     }
 
-    async function initAppFromCloud() {
+    // SLIMME ENKELVOUDIGE TABEL STRUCTUUR VOOR MULTI-PROJECT
+    async function loadProjectsListAndInit() {
         try {
             const { data, error } = await supabaseClient.from('pixelmap_app_state').select('*');
             if (error) throw error;
+
+            let serverData = data || [];
             
-            if (data && data.length > 0) {
-                data.forEach(row => {
-                    if (row.state_key === 'leds') db.leds = row.state_value.length > 0 ? row.state_value : [...defaultLeds];
-                    if (row.state_key === 'procs') db.procs = row.state_value || [];
-                    if (row.state_key === 'proj_procs') projectProcs = row.state_value || [];
-                    if (row.state_key === 'walls') {
-                        walls = row.state_value.map(w => {
-                            w.splitTiles = w.splitTiles || [];
-                            w.mount = w.mount || 'hang';
-                            w.stack = w.stack || { ladders_1m: [], ladders_05m: [], bases: [], fliepels: [] };
-                            if(!w.activeHangPoints) w.activeHangPoints = Array.from({length: w.cols}, (_, i) => i);
-                            return w;
-                        });
-                    }
-                    if (row.state_key === 'project_info') {
-                        document.getElementById('pi_name').value = row.state_value.name || '';
-                        document.getElementById('pi_loc').value = row.state_value.loc || '';
-                        document.getElementById('pi_date').value = row.state_value.date || '';
-                        document.getElementById('pi_tech').value = row.state_value.tech || '';
-                        document.getElementById('canW').value = row.state_value.canW || 3840;
-                        document.getElementById('canH').value = row.state_value.canH || 2160;
-                    }
-                });
+            // Haal de master list met projecten op
+            let projListRow = serverData.find(r => r.state_key === 'projects_list');
+            if (projListRow) {
+                allProjectsList = projListRow.state_value;
+            } else {
+                allProjectsList = [{ id: 'default_project', name: 'Standaard Project' }];
+                await supabaseClient.from('pixelmap_app_state').upsert({ state_key: 'projects_list', state_value: allProjectsList }, { onConflict: 'state_key' });
             }
+
+            // Controleer of huidig project nog bestaat, anders pak de eerste
+            if (!allProjectsList.find(p => p.id === currentProjectId)) {
+                currentProjectId = allProjectsList[0].id;
+                localStorage.setItem('pixelmap_active_project', currentProjectId);
+            }
+
+            updateProjectSelectorUI();
             
+            // Laad de data specifiek voor het actieve project via dynamische keys
+            let keyLeds = currentProjectId + '_leds';
+            let keyProcs = currentProjectId + '_procs';
+            let keyProjProcs = currentProjectId + '_proj_procs';
+            let keyWalls = currentProjectId + '_walls';
+            let keyInfo = currentProjectId + '_info';
+
+            let rowLeds = serverData.find(r => r.state_key === keyLeds);
+            let rowProcs = serverData.find(r => r.state_key === keyProcs);
+            let rowProjProcs = serverData.find(r => r.state_key === keyProjProcs);
+            let rowWalls = serverData.find(r => r.state_key === keyWalls);
+            let rowInfo = serverData.find(r => r.state_key === keyInfo);
+
+            db.leds = (rowLeds && rowLeds.state_value.length > 0) ? rowLeds.state_value : [...defaultLeds];
+            db.procs = (rowProcs && rowProcs.state_value.length > 0) ? rowProcs.state_value : [ { id: 'mx2000', name: 'Novastar MX2000', px: 650000, isFiber: true, fibers: 4, portsPerFiber: 10, ports: 40 }, { id: 'mctrl4k', name: 'Novastar MCTRL4K', px: 650000, isFiber: false, ports: 16 } ];
+            projectProcs = (rowProjProcs) ? rowProjProcs.state_value : [];
+            
+            walls = (rowWalls ? rowWalls.state_value : []).map(w => {
+                w.splitTiles = w.splitTiles || [];
+                w.mount = w.mount || 'hang';
+                w.stack = w.stack || { ladders_1m: [], ladders_05m: [], bases: [], fliepels: [] };
+                if(!w.activeHangPoints) w.activeHangPoints = Array.from({length: w.cols}, (_, i) => i);
+                return w;
+            });
+
+            let pInfo = rowInfo ? rowInfo.state_value : {};
+            let projObj = allProjectsList.find(p => p.id === currentProjectId);
+            
+            document.getElementById('pi_name').value = pInfo.name || (projObj ? projObj.name : '');
+            document.getElementById('pi_loc').value = pInfo.loc || '';
+            document.getElementById('pi_date').value = pInfo.date || '';
+            document.getElementById('pi_tech').value = pInfo.tech || '';
+            document.getElementById('canW').value = pInfo.canW || 3840;
+            document.getElementById('canH').value = pInfo.canH || 2160;
+
             if (projectProcs.length === 0 && db.procs.length > 0) { 
                 projectProcs.push({ id: 'p_'+Date.now(), dbId: db.procs[0].id }); 
                 saveAppCloudState(); 
             }
-            
+
             updateCanvasSize(); 
             document.getElementById('zoom').value = 0.2;
             applyZoom(0.2); 
             refreshDropdowns();
             renderCanvas();
+            
         } catch(err) {
-            console.error("Supabase laadfout:", err);
+            console.error("Fout bij laden projectenlijst:", err);
             alert("Let op: kon data niet inladen vanuit de cloud.\n\nFoutmelding: " + (err.message || JSON.stringify(err)));
         }
     }
 
-    // Massieve Upsert Actie & Visuele Cloud Sync
+    function updateProjectSelectorUI() {
+        let sel = document.getElementById('project-selector');
+        sel.innerHTML = '';
+        allProjectsList.forEach(p => {
+            sel.innerHTML += `<option value="${p.id}" ${p.id === currentProjectId ? 'selected' : ''}>${p.name}</option>`;
+        });
+    }
+
+    window.switchProject = async function(pId) {
+        let syncInd = document.getElementById('cloud-sync-indicator');
+        if(syncInd) { syncInd.innerText = "☁️ Project Laden..."; syncInd.style.color = "var(--warning)"; }
+        
+        currentProjectId = pId;
+        localStorage.setItem('pixelmap_active_project', currentProjectId);
+        await loadProjectsListAndInit();
+        
+        if(syncInd) { syncInd.innerText = "☁️ Geladen"; syncInd.style.color = "var(--success)"; setTimeout(()=>syncInd.innerText="", 2000); }
+    }
+
+    window.createNewProject = async function() {
+        let pName = prompt("Voer de naam van het nieuwe project in:", "Nieuw Project");
+        if (!pName || pName.trim() === "") return;
+        let pId = 'proj_' + Date.now();
+
+        allProjectsList.push({ id: pId, name: pName.trim() });
+        
+        let pInfo = { name: pName.trim(), loc: '', date: '', tech: '', canW: 3840, canH: 2160 };
+        let initialLeds = [...defaultLeds];
+        let initialProcs = [ { id: 'mx2000', name: 'Novastar MX2000', px: 650000, isFiber: true, fibers: 4, portsPerFiber: 10, ports: 40 }, { id: 'mctrl4k', name: 'Novastar MCTRL4K', px: 650000, isFiber: false, ports: 16 } ];
+        let initialProjProcs = [{ id: 'p_'+Date.now(), dbId: initialProcs[0].id }];
+
+        try {
+            await Promise.all([
+                supabaseClient.from('pixelmap_app_state').upsert({ state_key: 'projects_list', state_value: allProjectsList }, { onConflict: 'state_key' }),
+                supabaseClient.from('pixelmap_app_state').upsert({ state_key: pId + '_leds', state_value: initialLeds }, { onConflict: 'state_key' }),
+                supabaseClient.from('pixelmap_app_state').upsert({ state_key: pId + '_procs', state_value: initialProcs }, { onConflict: 'state_key' }),
+                supabaseClient.from('pixelmap_app_state').upsert({ state_key: pId + '_proj_procs', state_value: initialProjProcs }, { onConflict: 'state_key' }),
+                supabaseClient.from('pixelmap_app_state').upsert({ state_key: pId + '_walls', state_value: [] }, { onConflict: 'state_key' }),
+                supabaseClient.from('pixelmap_app_state').upsert({ state_key: pId + '_info', state_value: pInfo }, { onConflict: 'state_key' })
+            ]);
+            
+            updateProjectSelectorUI();
+            await switchProject(pId);
+        } catch(err) {
+            alert("Fout bij aanmaken project: " + err.message);
+        }
+    }
+    
+    window.deleteCurrentProject = async function() {
+        if(allProjectsList.length <= 1) {
+            alert("Je kunt het laatste project niet verwijderen.");
+            return;
+        }
+        
+        let projObj = allProjectsList.find(p => p.id === currentProjectId);
+        if(!confirm(`Weet je zeker dat je het project '${projObj.name}' definitief wilt verwijderen uit de cloud?`)) return;
+        
+        allProjectsList = allProjectsList.filter(p => p.id !== currentProjectId);
+        
+        try {
+            await supabaseClient.from('pixelmap_app_state').upsert({ state_key: 'projects_list', state_value: allProjectsList }, { onConflict: 'state_key' });
+            
+            // Clean up old keys (optioneel, we gooien ze nu voor het gemak weg via supabase UI of laten ze wezenzen)
+            await supabaseClient.from('pixelmap_app_state').delete().in('state_key', [currentProjectId + '_leds', currentProjectId + '_procs', currentProjectId + '_proj_procs', currentProjectId + '_walls', currentProjectId + '_info']);
+            
+            currentProjectId = allProjectsList[0].id;
+            localStorage.setItem('pixelmap_active_project', currentProjectId);
+            await loadProjectsListAndInit();
+        } catch(err) {
+            alert("Fout bij verwijderen project: " + err.message);
+        }
+    }
+
     window.saveAppCloudState = async function() {
         if (!isLoggedIn) return;
         
@@ -474,17 +595,32 @@
             canW: parseInt(document.getElementById('canW').value),
             canH: parseInt(document.getElementById('canH').value)
         };
-        
+
+        // Update project naam in master list als deze is gewijzigd
+        let pObj = allProjectsList.find(p => p.id === currentProjectId);
+        let nameChanged = false;
+        if(pObj && projInfo.name && pObj.name !== projInfo.name) {
+            pObj.name = projInfo.name;
+            nameChanged = true;
+        }
+
         try {
-            const { error } = await supabaseClient.from('pixelmap_app_state').upsert([
-                { state_key: 'leds', state_value: db.leds },
-                { state_key: 'procs', state_value: db.procs },
-                { state_key: 'proj_procs', state_value: projectProcs },
-                { state_key: 'walls', state_value: walls },
-                { state_key: 'project_info', state_value: projInfo }
-            ], { onConflict: 'state_key' });
+            let promises = [
+                supabaseClient.from('pixelmap_app_state').upsert({ state_key: currentProjectId + '_leds', state_value: db.leds }, { onConflict: 'state_key' }),
+                supabaseClient.from('pixelmap_app_state').upsert({ state_key: currentProjectId + '_procs', state_value: db.procs }, { onConflict: 'state_key' }),
+                supabaseClient.from('pixelmap_app_state').upsert({ state_key: currentProjectId + '_proj_procs', state_value: projectProcs }, { onConflict: 'state_key' }),
+                supabaseClient.from('pixelmap_app_state').upsert({ state_key: currentProjectId + '_walls', state_value: walls }, { onConflict: 'state_key' }),
+                supabaseClient.from('pixelmap_app_state').upsert({ state_key: currentProjectId + '_info', state_value: projInfo }, { onConflict: 'state_key' })
+            ];
             
-            if(error) throw error;
+            if(nameChanged) {
+                promises.push(supabaseClient.from('pixelmap_app_state').upsert({ state_key: 'projects_list', state_value: allProjectsList }, { onConflict: 'state_key' }));
+                updateProjectSelectorUI();
+            }
+
+            const results = await Promise.all(promises);
+            let hasError = results.some(r => r.error);
+            if(hasError) throw results.find(r => r.error).error;
             
             if(syncInd) { 
                 syncInd.innerText = "☁️ Opgeslagen"; 
@@ -1029,7 +1165,7 @@
                     let load = pointLoads[c].toFixed(1);
                     let lDiv = document.createElement('div');
                     lDiv.className = 'rig-weight-label ' + (load > 500 ? 'danger' : 'safe');
-                    lDiv.innerHTML = `${load}<br>kg`;
+                    lDiv.innerHTML = `${load} kg`;
                     lDiv.style.left = (col.x + (col.w / 2)) + 'px';
                     wDiv.appendChild(lDiv);
                 }
@@ -1399,7 +1535,6 @@
         }
       } else { banner.style.display = 'none'; }
 
-      // Sync bomTotals with calculated totals
       bomTotals.px = calcData.px;
       bomTotals.kg = calcData.kg;
       bomTotals.watt = calcData.watt;
@@ -1489,6 +1624,9 @@
 
                 let cX = wall.x - padding; let cY = wall.y - padding;
                 let cW = wallW + (padding * 2); let cH = wallH + (padding * 2) + 60; 
+                
+                cX = Math.max(0, cX);
+                cY = Math.max(0, cY);
 
                 container.classList.add('export-data-only');
                 await addPageToPDF(`Data Patch - ${wall.id}`, true, cX, cY, cW, cH);
