@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Pixelmap by MTR - V52 (Enter Login & Fixes)</title>
+  <title>Pixelmap by MTR - V53 (PDF Label Fix)</title>
   
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -27,6 +27,7 @@
     .login-box { background: var(--bg-panel); padding: 40px; border-radius: 12px; border: 1px solid var(--border); box-shadow: 0 10px 50px rgba(0,0,0,0.8); text-align: center; }
 
     #sidebar-left { width: 340px; min-width: 340px; max-width: 340px; background: var(--bg-panel); border-right: 1px solid var(--border); display: flex; flex-direction: column; z-index: 50; box-shadow: 2px 0 20px rgba(0,0,0,0.5); overflow-y: auto; }
+    /* WORKSPACE PADDING AANGEPAST VOOR EXTRA RIGGING RUIMTE (150px top) */
     #workspace { flex: 1 1 auto; min-width: 0; min-height: 0; position: relative; overflow: auto; background: var(--bg-app); padding: 150px 40px 100px 40px; cursor: grab; z-index: 1; }
     #workspace.dragging { cursor: grabbing; }
     #sidebar-right { width: 360px; min-width: 360px; max-width: 360px; background: var(--bg-panel); border-left: 1px solid var(--border); display: flex; flex-direction: column; z-index: 50; box-shadow: -2px 0 20px rgba(0,0,0,0.5); overflow-y: auto; }
@@ -52,7 +53,8 @@
     
     .wall-title-giant { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); font-weight: 900; color: #d4af37; text-shadow: 2px 2px 0 #000, -1px -1px 0 #000, 1px -1px 0 #000, -1px 1px 0 #000, 1px 1px 0 #000, 0px 4px 15px rgba(0,0,0,0.8); pointer-events: none; z-index: 15; white-space: nowrap; opacity: 0.85; font-family: Arial, Helvetica, sans-serif; letter-spacing: 1px; }
 
-    .wall-coord-label { position: absolute; font-size: 13px; font-weight: bold; color: var(--accent); background: #111; padding: 3px 8px; z-index: 60; pointer-events: none; font-family: monospace; border: 1px solid var(--accent); box-shadow: 0 4px 10px rgba(0,0,0,0.8); }
+    /* SCHERM COÖRDINATEN LABELS (START/STOP) - Nu met white-space nowrap om wrap-fouten te voorkomen */
+    .wall-coord-label { position: absolute; font-size: 13px; font-weight: bold; color: var(--accent); background: #111; padding: 3px 8px; z-index: 60; pointer-events: none; font-family: monospace; border: 1px solid var(--accent); box-shadow: 0 4px 10px rgba(0,0,0,0.8); white-space: nowrap; }
     .wall-coord-tl { top: -25px; left: -1px; border-radius: 6px 6px 0 0; border-bottom: none; }
     .wall-coord-br { bottom: -25px; right: -1px; border-radius: 0 0 6px 6px; border-top: none; }
 
@@ -63,6 +65,7 @@
 
     .patch-bg { background-color: #111; border: 1px solid #333; padding: 2px 6px; border-radius: 4px; box-shadow: 0 0 10px rgba(0,0,0,0.9); }
 
+    /* HARDWARE VISUALS OP PIXEL SCHAAL */
     .stack-ladder { position: absolute; width: 16px; left: calc(50% - 8px); bottom: 0; background-image: repeating-linear-gradient(0deg, transparent, transparent 18px, #1a1a1a 18px, #1a1a1a 22px); border-left: 2px solid #555; border-right: 2px solid #555; z-index: 0; pointer-events: none; opacity: 0.95; display: none; box-shadow: inset 1px 0 0 rgba(255,255,255,0.1), inset -1px 0 0 rgba(0,0,0,0.5); }
     .stack-base { position: absolute; width: calc(100% + 4px); height: 16px; bottom: -16px; left: -2px; background: linear-gradient(180deg, #555, #222); border: 1px solid #000; z-index: 6; pointer-events: none; box-shadow: 0 5px 10px rgba(0,0,0,0.8); border-radius: 2px; display: none; }
     .stack-foot { position: absolute; width: 16px; height: 6px; bottom: -22px; left: calc(50% - 8px); background: #111; border-radius: 4px; border-bottom: 2px solid #000; z-index: 5; pointer-events: none; display: none; box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
@@ -141,7 +144,8 @@
     .export-screen-mode .wall-title-giant { color: #e0e0e0; text-shadow: none; opacity: 0.6; } 
     .export-screen-mode .patch-bg { background-color: #fff; border: 1px solid #ccc; box-shadow: none; }
     
-    .export-screen-mode .wall-coord-label { background: #fff !important; color: #000 !important; border: 2px solid #000 !important; }
+    /* V53: Verwijder de box-shadow op de wall-coords tijdens PDF export om rendering bugs te voorkomen */
+    .export-screen-mode .wall-coord-label { background: #fff !important; color: #000 !important; border: 2px solid #000 !important; box-shadow: none !important; white-space: nowrap !important; }
     .export-screen-mode .wall-coord-tl { border-bottom: none !important; }
     .export-screen-mode .wall-coord-br { border-top: none !important; }
 
@@ -169,7 +173,6 @@
     <div class="login-box">
         <h2>Pixelmap by MTR</h2>
         <p style="color:var(--text-muted); margin-bottom:20px;">Voer de toegangscode in om te starten.</p>
-        <!-- V52: onkeyup toegevoegd voor Enter functionaliteit -->
         <input type="password" id="pin-code" placeholder="***" onkeyup="if(event.key === 'Enter') checkLogin()" style="width:150px; text-align:center; font-size:24px; letter-spacing:10px; padding:10px; margin-bottom:15px; border:2px solid #333; background:#000; border-radius:8px;">
         <br>
         <button id="login-btn" onclick="checkLogin()" style="width:150px; padding:12px; font-size:16px;">Inloggen</button>
@@ -401,7 +404,7 @@
   </div>
 
   <script>
-    // --- SUPABASE CLOUD SETUP V52 ---
+    // --- SUPABASE CLOUD SETUP V53 ---
     const supabaseUrl = 'https://gjpoebdsyvqtxyazwmxp.supabase.co';
     const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdqcG9lYmRzeXZxdHh5YXp3bXhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODY0NjU0NjcsImV4cCI6MjEwMjA0MTQ2N30.9SHv-ce1-ytuVKvh1ylT8ZPyYj0FXsz7Lk8rgsjSMsA';
     const supabaseClient = typeof supabase !== 'undefined' ? supabase.createClient(supabaseUrl, supabaseKey) : null;
@@ -425,7 +428,6 @@
         loadProjectsListAndInit();
     }
 
-    // V52: Verbeterde login actie (trim, visuele feedback)
     window.checkLogin = function() {
         let pinInput = document.getElementById('pin-code').value.trim();
         if(pinInput === '666') {
@@ -444,7 +446,6 @@
         location.reload();
     }
 
-    // GLOBALE BIBLIOTHEEK + PROJECT DATA INLADEN
     async function loadProjectsListAndInit() {
         if (!supabaseClient) { alert("Supabase kon niet geladen worden. Check je internetverbinding."); return; }
         
@@ -475,7 +476,6 @@
             db.leds = (rowLeds && rowLeds.state_value.length > 0) ? rowLeds.state_value : [...defaultLeds];
             db.procs = (rowProcs && rowProcs.state_value.length > 0) ? rowProcs.state_value : [...defaultProcs];
 
-            // PROJECT SPECIFIEKE DATA INLADEN
             let keyProjProcs = currentProjectId + '_proj_procs';
             let keyWalls = currentProjectId + '_walls';
             let keyInfo = currentProjectId + '_info';
@@ -640,7 +640,6 @@
             if(syncInd) { syncInd.innerText = "☁️ Fout bij opslaan!"; syncInd.style.color = "var(--danger)"; }
         }
     };
-    // --- EINDE SUPABASE SETUP ---
 
     const MAX_POWER_PER_GROUP = 3600;
     let activePatchWall = null; 
@@ -843,7 +842,6 @@
       }
     };
 
-    // Engine: W, H, X, Y in Pixels op Canvas. Physics berekent via physW/physH
     function getWallPanels(wall) {
         let panels = [];
         for(let r=0; r<wall.rows; r++) {
@@ -1553,6 +1551,7 @@
         }
       } else { banner.style.display = 'none'; }
 
+      // Sync bomTotals with calculated totals
       bomTotals.px = calcData.px;
       bomTotals.kg = calcData.kg;
       bomTotals.watt = calcData.watt;
